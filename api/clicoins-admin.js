@@ -168,6 +168,7 @@ export default manejador(['POST'], async (req) => {
         motivo: String(cuerpo.motivo || 'Ajuste manual').slice(0, 200),
         detalle: { admin: admin.email },
       });
+      console.log('[clicoins] ajuste admin', { por: admin.email, uid, monto, saldo: r.saldo });
       return { uid, saldo: r.saldo };
     }
 

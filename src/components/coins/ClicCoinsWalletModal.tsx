@@ -301,6 +301,7 @@ export const ClicCoinsWalletModal: React.FC = () => {
     setWalletOpen,
     setAdminPanelOpen,
     isAdmin,
+    errorLectura,
   } = useClicCoins();
 
   const [activeTab, setActiveTab] = useState<'comprar' | 'historial' | 'cuenta'>('comprar');
@@ -392,6 +393,13 @@ export const ClicCoinsWalletModal: React.FC = () => {
             {tabBtn('comprar', <CreditCard className="w-4 h-4" />, 'Comprar ClicCoins')}
             {tabBtn('historial', <History className="w-4 h-4" />, `Historial (${transactions.length})`)}
             {tabBtn('cuenta', <ShieldCheck className="w-4 h-4" />, isAdmin ? 'Mi Cuenta & Admin' : 'Mi Cuenta')}
+          </div>
+        )}
+
+        {user && errorLectura && (
+          <div className="mx-6 mt-4 p-4 rounded-2xl flex items-center gap-3 text-xs sm:text-sm font-bold shrink-0 bg-red-500/15 text-red-700 dark:text-red-400 border border-red-500/30">
+            <XCircle className="w-5 h-5 shrink-0" />
+            <p className="flex-1">{errorLectura}</p>
           </div>
         )}
 

@@ -107,6 +107,7 @@ interface ClicCoinsContextType {
   items: Record<string, { nombre: string; veces: number }>;
   yappyInfo: { activo: boolean; numero: string; nombre: string };
   loading: boolean;
+  errorLectura: string | null;
 
   // Ventanas
   walletOpen: boolean;
@@ -242,6 +243,7 @@ export const ClicCoinsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [packages, setPackages] = useState<CoinPackage[]>(PAQUETES_LOCALES);
   const [yappyInfo, setYappyInfo] = useState({ activo: false, numero: '', nombre: 'CLICMASTER' });
   const [loading, setLoading] = useState(false);
+  const [errorLectura, setErrorLectura] = useState<string | null>(null);
   const [walletOpen, setWalletOpen] = useState(false);
   const [adminPanelOpen, setAdminPanelOpen] = useState(false);
 
@@ -305,17 +307,27 @@ export const ClicCoinsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       return;
     }
     const uid = fbUser.uid;
+    const alFallar = (que: string) => (e: any) => {
+      console.error(`[ClicCoins] No se pudo leer ${que}:`, e?.code || e);
+      setErrorLectura(
+        e?.code === 'permission-denied'
+          ? 'Firebase bloqueó la lectura de tu billetera. Revisa que las reglas de Firestore estén publicadas.'
+          : `No se pudo leer ${que} (${e?.code || 'error'}).`
+      );
+    };
     const perfil = { id: uid, username: fbUser.displayName || fbUser.email || '' } as UserProfile;
     const quitar = [
-      onSnapshot(doc(fb.db, 'wallets', uid), (s) => setBalance(s.exists() ? Number(s.data().balance || 0) : 0)),
+      onSnapshot(doc(fb.db, 'wallets', uid), (s) => { setErrorLectura(null); setBalance(s.exists() ? Number(s.data().balance || 0) : 0); }, alFallar('tu saldo')),
       onSnapshot(
         query(collection(fb.db, 'wallets', uid, 'movimientos'), orderBy('fecha', 'desc'), limit(50)),
-        (s) => setMovimientos(s.docs.map((d) => movimientoATransaccion(d.id, d.data(), perfil)))
+        (s) => setMovimientos(s.docs.map((d) => movimientoATransaccion(d.id, d.data(), perfil))),
+        alFallar('tu historial')
       ),
       onSnapshot(query(collection(fb.db, 'yappy_solicitudes'), where('uid', '==', uid)), (s) =>
-        setSolicitudes(s.docs.map((d) => ({ id: d.id, ...d.data() })))
+        setSolicitudes(s.docs.map((d) => ({ id: d.id, ...d.data() }))),
+        alFallar('tus recargas Yappy')
       ),
-      onSnapshot(doc(fb.db, 'beneficios', uid), (s) => setBeneficios(s.exists() ? s.data() : {})),
+      onSnapshot(doc(fb.db, 'beneficios', uid), (s) => setBeneficios(s.exists() ? s.data() : {}), alFallar('tus beneficios')),
     ];
     return () => quitar.forEach((f) => f());
   }, [fbUser]);
@@ -530,6 +542,7 @@ export const ClicCoinsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         items,
         yappyInfo,
         loading,
+        errorLectura,
         walletOpen,
         setWalletOpen,
         adminPanelOpen,

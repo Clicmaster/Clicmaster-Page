@@ -1,0 +1,8 @@
+{
+  "name": "CLICMaster Web 2026",
+  "description": "La plataforma oficial del servidor de Roleplay más activo de Roblox en Latinoamérica. Mapa interactivo, facciones, economía real, DNI virtual y comunidad.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

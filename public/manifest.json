@@ -1,0 +1,25 @@
+{
+  "name": "CLICMaster Roleplay Latam 2026",
+  "short_name": "CLICMaster",
+  "description": "La plataforma oficial del servidor de Roleplay más activo de Roblox en Latinoamérica.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#67F23B",
+  "lang": "es",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/assets/brand/CLIC_MASTER_final-07_0791f7ab.webp",
+      "sizes": "192x192",
+      "type": "image/webp",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/assets/brand/CLIC_MASTER_final-07_0791f7ab.webp",
+      "sizes": "512x512",
+      "type": "image/webp",
+      "purpose": "any maskable"
+    }
+  ]
+}

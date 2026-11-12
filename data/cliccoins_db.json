@@ -1,0 +1,135 @@
+{
+  "users": {
+    "usr-carlos-01": {
+      "id": "usr-carlos-01",
+      "username": "Carlos_RP",
+      "roblox_username": "Rodriguez_Capo",
+      "cliccoins_balance": 1150,
+      "role": "admin",
+      "avatar": "/assets/brand/CLIC_MASTER_final-07_0791f7ab.webp",
+      "created_at": "2026-10-10T20:40:18.463Z"
+    },
+    "usr-valentina-02": {
+      "id": "usr-valentina-02",
+      "username": "Doc_Valentina",
+      "roblox_username": "Valentina_SAMUR",
+      "cliccoins_balance": 850,
+      "role": "user",
+      "avatar": "/assets/brand/CLIC_MASTER_final-07_0791f7ab.webp",
+      "created_at": "2026-10-25T20:40:18.464Z"
+    },
+    "usr-pilot-03": {
+      "id": "usr-pilot-03",
+      "username": "PilotSky_RP",
+      "roblox_username": "AeroPilot_Latam",
+      "cliccoins_balance": 100,
+      "role": "user",
+      "avatar": "/assets/brand/CLIC_MASTER_final-07_0791f7ab.webp",
+      "created_at": "2026-10-30T20:40:18.464Z"
+    }
+  },
+  "transactions": [
+    {
+      "id": "tx_1794256830387_g3y9c",
+      "user_id": "usr-carlos-01",
+      "username": "Carlos_RP",
+      "tipo": "gasto_tienda",
+      "cantidad_coins": 100,
+      "monto_dinero_real": 0,
+      "metodo_pago": "Sistema",
+      "estado": "completado",
+      "referencia_pago": "SHOP-TEST-ITEM",
+      "detalles": "Compra en tienda: Ítem de Prueba",
+      "timestamp": "2026-11-09T20:40:30.387Z",
+      "reviewed_at": "2026-11-09T20:40:30.387Z",
+      "reviewed_by": "Sistema_Tienda_RP"
+    },
+    {
+      "id": "tx_init_01",
+      "user_id": "usr-carlos-01",
+      "username": "Carlos_RP",
+      "tipo": "bonificacion",
+      "cantidad_coins": 500,
+      "monto_dinero_real": 0,
+      "metodo_pago": "Sistema",
+      "estado": "completado",
+      "referencia_pago": "BONUS_BIENVENIDA_2026",
+      "detalles": "Bono de bienvenida de temporada CLICMaster 2026",
+      "timestamp": "2026-11-04T20:40:18.464Z"
+    },
+    {
+      "id": "tx_init_02",
+      "user_id": "usr-carlos-01",
+      "username": "Carlos_RP",
+      "tipo": "compra_coins",
+      "cantidad_coins": 1000,
+      "monto_dinero_real": 14.99,
+      "metodo_pago": "PayPal",
+      "estado": "completado",
+      "referencia_pago": "PAYPAL-ORD-8829104-CAPTURED",
+      "detalles": "Compra instantánea Pack Élite (1,000 Coins + 150 Bonus)",
+      "timestamp": "2026-11-06T20:40:18.464Z"
+    },
+    {
+      "id": "tx_init_03",
+      "user_id": "usr-carlos-01",
+      "username": "Carlos_RP",
+      "tipo": "gasto_tienda",
+      "cantidad_coins": 250,
+      "monto_dinero_real": 0,
+      "metodo_pago": "Sistema",
+      "estado": "completado",
+      "referencia_pago": "PURCHASE-UNIFORME-RPD",
+      "detalles": "Compra de Uniforme Táctico Policía (RPD)",
+      "timestamp": "2026-11-07T20:40:18.464Z"
+    },
+    {
+      "id": "tx_pend_01",
+      "user_id": "usr-valentina-02",
+      "username": "Doc_Valentina",
+      "tipo": "compra_coins",
+      "cantidad_coins": 500,
+      "monto_dinero_real": 7.99,
+      "metodo_pago": "Yappy",
+      "estado": "completado",
+      "referencia_pago": "YP-9402847",
+      "detalles": "Pago móvil Yappy a CLICMASTER LATAM INC - Tel: +507 6829-4411",
+      "timestamp": "2026-11-09T20:15:18.464Z",
+      "reviewed_at": "2026-11-09T20:40:40.917Z",
+      "reviewed_by": "Admin_Master"
+    },
+    {
+      "id": "tx_pend_02",
+      "user_id": "usr-pilot-03",
+      "username": "PilotSky_RP",
+      "tipo": "compra_coins",
+      "cantidad_coins": 1000,
+      "monto_dinero_real": 650,
+      "metodo_pago": "Robux",
+      "estado": "pendiente",
+      "referencia_pago": "RBX-DEV-993817",
+      "detalles": "Gamepass Comprado en Roblox Game: CLICMaster RP Oficial",
+      "timestamp": "2026-11-09T20:30:18.464Z"
+    }
+  ],
+  "shop_purchases": [
+    {
+      "id": "sp_1794256830387_xqbha",
+      "user_id": "usr-carlos-01",
+      "username": "Carlos_RP",
+      "item_id": "test-item",
+      "item_name": "Ítem de Prueba",
+      "cost_coins": 100,
+      "timestamp": "2026-11-09T20:40:30.387Z"
+    },
+    {
+      "id": "sp_init_01",
+      "user_id": "usr-carlos-01",
+      "username": "Carlos_RP",
+      "item_id": "v-uniforme-policia",
+      "item_name": "Uniforme Táctico Policía (RPD)",
+      "cost_coins": 250,
+      "timestamp": "2026-11-07T20:40:18.464Z"
+    }
+  ]
+}

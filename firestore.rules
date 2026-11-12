@@ -1,0 +1,43 @@
+rules_version = '2';
+// ===================================================================
+// REGLAS DE SEGURIDAD DE CLICCOINS (pegar en Firebase > Firestore > Reglas)
+// - Cada usuario solo puede LEER su propia billetera, historial,
+//   beneficios y solicitudes de Yappy.
+// - NADIE puede escribir desde el navegador: las monedas solo las
+//   cambia el servidor (las funciones de Vercel).
+// Si tu página ya usa Firestore para otras cosas, NO borres tus reglas:
+// copia solo los bloques "match" de abajo dentro de las tuyas.
+// ===================================================================
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /wallets/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false;
+
+      match /movimientos/{movId} {
+        allow read: if request.auth != null && request.auth.uid == uid;
+        allow write: if false;
+      }
+    }
+
+    match /beneficios/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false;
+    }
+
+    match /yappy_solicitudes/{id} {
+      allow read: if request.auth != null && resource.data.uid == request.auth.uid;
+      allow write: if false;
+    }
+
+    match /pedidos/{id} {
+      allow read: if request.auth != null && resource.data.uid == request.auth.uid;
+      allow write: if false;
+    }
+
+    match /paypal_ordenes/{id} {
+      allow read, write: if false;
+    }
+  }
+}

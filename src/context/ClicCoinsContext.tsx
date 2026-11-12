@@ -1,12 +1,31 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import {
+  onAuthStateChanged,
+  GoogleAuthProvider,
+  signInWithPopup,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  sendPasswordResetEmail,
+  signOut,
+  type User,
+} from 'firebase/auth';
+import { collection, doc, limit, onSnapshot, orderBy, query, where } from 'firebase/firestore';
+import { firebase, firebaseConfigurado } from '../lib/firebase.ts';
+import { llamarApi, idAleatorio } from '../lib/clicoinsApi.ts';
+// Precios compartidos con el servidor (un solo lugar para editarlos)
+import { PAQUETES_RECARGA, ARTICULOS, precioCoins as precioServidor } from '../../api/_lib/precios.js';
 
-export type PaymentMethod = 'Yappy' | 'PayPal' | 'Robux' | 'Sistema';
+// ============================================================================
+// Tipos (se mantienen los nombres que ya usaba la página)
+// ============================================================================
+export type PaymentMethod = 'Yappy' | 'PayPal' | 'Sistema';
 export type TransactionStatus = 'pendiente' | 'completado' | 'rechazado';
 export type TransactionType = 'compra_coins' | 'gasto_tienda' | 'bonificacion' | 'reembolso';
 
 export interface UserProfile {
   id: string;
   username: string;
+  email: string;
   roblox_username: string;
   cliccoins_balance: number;
   role: 'user' | 'admin';
@@ -20,10 +39,13 @@ export interface ClicTransaction {
   username: string;
   tipo: TransactionType;
   cantidad_coins: number;
+  /** positivo = entra, negativo = sale */
+  signo: 1 | -1;
   monto_dinero_real: number;
   metodo_pago: PaymentMethod;
   estado: TransactionStatus;
   referencia_pago: string;
+  codigo_yappy?: string;
   detalles?: string;
   timestamp: string;
   reviewed_at?: string;
@@ -36,560 +58,499 @@ export interface CoinPackage {
   coins: number;
   bonus: number;
   priceUsd: number;
-  priceRobux: number;
   name: string;
   tag?: string;
   popular?: boolean;
 }
 
+export interface YappySolicitud {
+  solicitudId: string;
+  codigo: string;
+  estado: string;
+  precioUsd: string;
+  coins: number;
+  paqueteNombre: string;
+  yappyNumero: string;
+  yappyNombre: string;
+}
+
+export interface Pedido {
+  id: string;
+  email: string;
+  articulo: string;
+  precioCoins: number;
+  robloxUser: string;
+  discordUser: string;
+  estado: 'por-entregar' | 'entregado';
+  creado: number | null;
+  entregadoPor: string | null;
+}
+
+type Resultado = { success: boolean; message: string };
+
 interface ClicCoinsContextType {
+  // Sesión
+  configurado: boolean;
+  authReady: boolean;
   user: UserProfile | null;
+  loginWithGoogle: () => Promise<Resultado>;
+  loginWithEmail: (email: string, password: string) => Promise<Resultado>;
+  registerWithEmail: (email: string, password: string) => Promise<Resultado>;
+  resetPassword: (email: string) => Promise<Resultado>;
+  logout: () => Promise<void>;
+
+  // Saldo y datos
   balance: number;
   transactions: ClicTransaction[];
-  pendingPayments: ClicTransaction[];
   packages: CoinPackage[];
+  membresias: Record<string, number>;
+  items: Record<string, { nombre: string; veces: number }>;
+  yappyInfo: { activo: boolean; numero: string; nombre: string };
   loading: boolean;
-  isAdmin: boolean;
+
+  // Ventanas
   walletOpen: boolean;
   setWalletOpen: (open: boolean) => void;
   adminPanelOpen: boolean;
   setAdminPanelOpen: (open: boolean) => void;
-  refreshBalance: () => Promise<void>;
+
+  // Recargas
+  paypalCreateOrder: (packageId: string) => Promise<string>;
+  paypalCapture: (orderId: string) => Promise<Resultado & { pending?: boolean }>;
+  yappyStart: (packageId: string) => Promise<YappySolicitud>;
+  yappyConfirm: (solicitudId: string, comprobante: string) => Promise<Resultado>;
+  yappyCancel: (solicitudId: string) => Promise<Resultado>;
+
+  // Tienda
+  priceOf: (itemId: string) => number | null;
+  purchaseWithCoins: (
+    itemId: string,
+    itemName: string,
+    costCoins: number,
+    extra?: { robloxUser?: string; discordUser?: string }
+  ) => Promise<Resultado & { newBalance?: number }>;
+
+  // Admin
+  isAdmin: boolean;
+  pendingPayments: ClicTransaction[];
   fetchPendingPayments: () => Promise<void>;
-  buyCoinsRequest: (params: {
-    packageId?: string;
-    coins: number;
-    amountMoney: number;
-    paymentMethod: PaymentMethod;
-    paymentReference: string;
-    detalles?: string;
-  }) => Promise<{ success: boolean; message: string; transaction?: ClicTransaction }>;
-  simulatePayPalCapture: (orderId: string, coins: number, amountUsd: number) => Promise<{ success: boolean; message: string }>;
-  purchaseWithCoins: (itemId: string, itemName: string, costCoins: number) => Promise<{ success: boolean; message: string; newBalance?: number }>;
-  approvePayment: (transactionId: string) => Promise<{ success: boolean; message: string }>;
-  rejectPayment: (transactionId: string, reason?: string) => Promise<{ success: boolean; message: string }>;
-  toggleAdminRole: () => Promise<void>;
+  adminListPayments: (estado: 'pendiente' | 'esperando-pago' | 'aprobada' | 'rechazada') => Promise<ClicTransaction[]>;
+  approvePayment: (transactionId: string) => Promise<Resultado>;
+  rejectPayment: (transactionId: string, reason?: string) => Promise<Resultado>;
+  adminListOrders: (estado: 'por-entregar' | 'entregado') => Promise<Pedido[]>;
+  adminMarkDelivered: (pedidoId: string) => Promise<Resultado>;
+  adminAdjust: (email: string, amount: number, reason: string) => Promise<Resultado>;
+  refreshBalance: () => Promise<void>;
 }
 
-const DEFAULT_USER: UserProfile = {
-  id: 'usr-carlos-01',
-  username: 'Carlos_RP',
-  roblox_username: 'Rodriguez_Capo',
-  cliccoins_balance: 1250,
-  role: 'admin',
-  avatar: '/assets/brand/CLIC_MASTER_final-07_0791f7ab.webp',
-  created_at: '2026-10-01T00:00:00.000Z',
+// ============================================================================
+// Utilidades
+// ============================================================================
+const PAQUETES_LOCALES: CoinPackage[] = PAQUETES_RECARGA.map((p: any) => ({
+  id: p.id,
+  coins: p.coins,
+  bonus: p.bonus || 0,
+  priceUsd: Number(p.precioUsd),
+  name: p.name,
+  tag: p.tag,
+  popular: p.popular,
+}));
+
+const aIso = (t: any): string => {
+  const ms = t && typeof t.toMillis === 'function' ? t.toMillis() : typeof t === 'number' ? t : Date.now();
+  return new Date(ms).toISOString();
 };
 
-const DEFAULT_PACKAGES: CoinPackage[] = [
-  {
-    id: 'pack-100',
-    coins: 100,
-    bonus: 0,
-    priceUsd: 1.99,
-    priceRobux: 80,
-    name: 'Pack Básico',
-    tag: 'Iniciación',
-  },
-  {
-    id: 'pack-500',
-    coins: 500,
-    bonus: 50,
-    priceUsd: 7.99,
-    priceRobux: 350,
-    name: 'Pack Ciudadano',
-    tag: 'Popular',
-    popular: true,
-  },
-  {
-    id: 'pack-1000',
-    coins: 1000,
-    bonus: 150,
-    priceUsd: 14.99,
-    priceRobux: 650,
-    name: 'Pack Élite',
-    tag: 'Recomendado',
-  },
-  {
-    id: 'pack-2500',
-    coins: 2500,
-    bonus: 500,
-    priceUsd: 29.99,
-    priceRobux: 1400,
-    name: 'Pack Magnate',
-    tag: 'Gran Ahorro',
-  },
-  {
-    id: 'pack-5000',
-    coins: 5000,
-    bonus: 1250,
-    priceUsd: 49.99,
-    priceRobux: 2500,
-    name: 'Pack Imperio',
-    tag: 'VIP Máximo',
-  },
-];
+const mensajeAuth = (e: any): string => {
+  const c = String(e?.code || '');
+  if (c.includes('invalid-credential') || c.includes('wrong-password') || c.includes('user-not-found'))
+    return 'Correo o contraseña incorrectos.';
+  if (c.includes('email-already-in-use')) return 'Ese correo ya tiene una cuenta. Inicia sesión.';
+  if (c.includes('weak-password')) return 'La contraseña debe tener al menos 6 caracteres.';
+  if (c.includes('invalid-email')) return 'El correo no es válido.';
+  if (c.includes('popup-closed') || c.includes('cancelled-popup')) return 'Se cerró la ventana de Google.';
+  if (c.includes('popup-blocked')) return 'El navegador bloqueó la ventana de Google. Permite ventanas emergentes.';
+  if (c.includes('unauthorized-domain')) return 'Este dominio no está autorizado en Firebase (Authentication > Dominios autorizados).';
+  if (c.includes('too-many-requests')) return 'Demasiados intentos. Espera unos minutos.';
+  return 'No se pudo iniciar sesión. Intenta de nuevo.';
+};
 
-const DEFAULT_TRANSACTIONS: ClicTransaction[] = [
-  {
-    id: 'tx_init_01',
-    user_id: 'usr-carlos-01',
-    username: 'Carlos_RP',
-    tipo: 'bonificacion',
-    cantidad_coins: 500,
-    monto_dinero_real: 0,
-    metodo_pago: 'Sistema',
+function movimientoATransaccion(id: string, m: any, user: UserProfile): ClicTransaction {
+  const monto = Number(m.monto || 0);
+  const tipoMov = String(m.tipo || '');
+  const tipo: TransactionType = tipoMov.startsWith('recarga')
+    ? 'compra_coins'
+    : tipoMov === 'compra-tienda'
+    ? 'gasto_tienda'
+    : monto > 0
+    ? 'bonificacion'
+    : 'reembolso';
+  return {
+    id,
+    user_id: user.id,
+    username: user.username,
+    tipo,
+    cantidad_coins: Math.abs(monto),
+    signo: monto >= 0 ? 1 : -1,
+    monto_dinero_real: Number(m.detalle?.precioUsd || 0),
+    metodo_pago: tipoMov === 'recarga-paypal' ? 'PayPal' : tipoMov === 'recarga-yappy' ? 'Yappy' : 'Sistema',
     estado: 'completado',
-    referencia_pago: 'BONUS_BIENVENIDA_2026',
-    detalles: 'Bono de bienvenida de temporada CLICMaster 2026',
-    timestamp: new Date(Date.now() - 5 * 86400000).toISOString(),
-  },
-  {
-    id: 'tx_init_02',
-    user_id: 'usr-carlos-01',
-    username: 'Carlos_RP',
+    referencia_pago: m.detalle?.codigo || m.ref || id,
+    detalles: m.motivo || '',
+    timestamp: aIso(m.fecha),
+  };
+}
+
+function solicitudATransaccion(s: any, fallbackUser?: UserProfile | null): ClicTransaction {
+  const rechazada = s.estado === 'rechazada';
+  return {
+    id: s.id,
+    user_id: s.uid || fallbackUser?.id || '',
+    username: s.email || fallbackUser?.username || '',
     tipo: 'compra_coins',
-    cantidad_coins: 1000,
-    monto_dinero_real: 14.99,
-    metodo_pago: 'PayPal',
-    estado: 'completado',
-    referencia_pago: 'PAYPAL-ORD-8829104-CAPTURED',
-    detalles: 'Compra instantánea Pack Élite (1,000 Coins + 150 Bonus)',
-    timestamp: new Date(Date.now() - 3 * 86400000).toISOString(),
-  },
-  {
-    id: 'tx_init_03',
-    user_id: 'usr-carlos-01',
-    username: 'Carlos_RP',
-    tipo: 'gasto_tienda',
-    cantidad_coins: 250,
-    monto_dinero_real: 0,
-    metodo_pago: 'Sistema',
-    estado: 'completado',
-    referencia_pago: 'PURCHASE-UNIFORME-RPD',
-    detalles: 'Compra de Uniforme Táctico Policía (RPD)',
-    timestamp: new Date(Date.now() - 2 * 86400000).toISOString(),
-  },
-  {
-    id: 'tx_pend_01',
-    user_id: 'usr-valentina-02',
-    username: 'Doc_Valentina',
-    tipo: 'compra_coins',
-    cantidad_coins: 500,
-    monto_dinero_real: 7.99,
+    cantidad_coins: Number(s.coins || 0),
+    signo: 1,
+    monto_dinero_real: Number(s.precioUsd || 0),
     metodo_pago: 'Yappy',
-    estado: 'pendiente',
-    referencia_pago: 'YP-9402847',
-    detalles: 'Pago móvil Yappy a CLICMASTER LATAM INC - Tel: +507 6829-4411',
-    timestamp: new Date(Date.now() - 25 * 60000).toISOString(),
-  },
-  {
-    id: 'tx_pend_02',
-    user_id: 'usr-pilot-03',
-    username: 'PilotSky_RP',
-    tipo: 'compra_coins',
-    cantidad_coins: 1000,
-    monto_dinero_real: 650,
-    metodo_pago: 'Robux',
-    estado: 'pendiente',
-    referencia_pago: 'RBX-DEV-993817',
-    detalles: 'Gamepass Comprado en Roblox Game: CLICMaster RP Oficial',
-    timestamp: new Date(Date.now() - 10 * 60000).toISOString(),
-  },
-];
+    estado: s.estado === 'aprobada' ? 'completado' : rechazada ? 'rechazado' : 'pendiente',
+    referencia_pago: s.comprobante || 'Sin comprobante todavía',
+    codigo_yappy: s.codigo,
+    detalles:
+      s.estado === 'esperando-pago'
+        ? `Recarga Yappy ${s.paqueteNombre} · esperando tu pago`
+        : `Recarga Yappy ${s.paqueteNombre}`,
+    timestamp: aIso(s.confirmada || s.creada),
+    reviewed_by: s.revisadaPor,
+    rejection_reason: s.motivoRechazo || undefined,
+  };
+}
 
+// ============================================================================
+// Proveedor
+// ============================================================================
 const ClicCoinsContext = createContext<ClicCoinsContextType | undefined>(undefined);
 
 export const ClicCoinsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Read local storage initial values if available for offline resilience
-  const getInitialUser = (): UserProfile => {
-    try {
-      const stored = localStorage.getItem('cliccoins_user');
-      if (stored) return JSON.parse(stored);
-    } catch {
-      // fallback
-    }
-    return DEFAULT_USER;
-  };
+  const [fbUser, setFbUser] = useState<User | null>(null);
+  const [authReady, setAuthReady] = useState(!firebaseConfigurado);
+  const [balance, setBalance] = useState(0);
+  const [movimientos, setMovimientos] = useState<ClicTransaction[]>([]);
+  const [solicitudes, setSolicitudes] = useState<any[]>([]);
+  const [beneficios, setBeneficios] = useState<any>({});
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [pendingPayments, setPendingPayments] = useState<ClicTransaction[]>([]);
+  const [packages, setPackages] = useState<CoinPackage[]>(PAQUETES_LOCALES);
+  const [yappyInfo, setYappyInfo] = useState({ activo: false, numero: '', nombre: 'CLICMASTER' });
+  const [loading, setLoading] = useState(false);
+  const [walletOpen, setWalletOpen] = useState(false);
+  const [adminPanelOpen, setAdminPanelOpen] = useState(false);
 
-  const getInitialTransactions = (): ClicTransaction[] => {
-    try {
-      const stored = localStorage.getItem('cliccoins_transactions');
-      if (stored) return JSON.parse(stored);
-    } catch {
-      // fallback
-    }
-    return DEFAULT_TRANSACTIONS;
-  };
-
-  const [user, setUser] = useState<UserProfile>(getInitialUser);
-  const [balance, setBalance] = useState<number>(user.cliccoins_balance);
-  const [transactions, setTransactions] = useState<ClicTransaction[]>(getInitialTransactions);
-  const [pendingPayments, setPendingPayments] = useState<ClicTransaction[]>(() =>
-    DEFAULT_TRANSACTIONS.filter((t) => t.estado === 'pendiente')
-  );
-  const [packages, setPackages] = useState<CoinPackage[]>(DEFAULT_PACKAGES);
-  const [loading, setLoading] = useState<boolean>(false);
-  const [walletOpen, setWalletOpen] = useState<boolean>(false);
-  const [adminPanelOpen, setAdminPanelOpen] = useState<boolean>(false);
-
-  // Sync state with localStorage
-  const persistState = useCallback((updatedUser: UserProfile, updatedTx: ClicTransaction[]) => {
-    try {
-      localStorage.setItem('cliccoins_user', JSON.stringify(updatedUser));
-      localStorage.setItem('cliccoins_transactions', JSON.stringify(updatedTx));
-    } catch {
-      // ignore
-    }
-  }, []);
-
-  // 1. Obtener saldo y transacciones con fallback silencioso
-  const refreshBalance = useCallback(async () => {
-    try {
-      const res = await fetch('/api/user/balance?userId=usr-carlos-01');
-      if (res.ok) {
-        const data = await res.json();
-        if (data && data.success && data.user) {
-          setUser(data.user);
-          setBalance(data.balance);
-          setTransactions(data.transactions || []);
-          persistState(data.user, data.transactions || []);
-        }
-      }
-    } catch {
-      // Silently maintain local state without logging errors
-    }
-  }, [persistState]);
-
-  // 2. Obtener lista de pagos pendientes con fallback silencioso
-  const fetchPendingPayments = useCallback(async () => {
-    try {
-      const res = await fetch('/api/admin/pending-payments');
-      if (res.ok) {
-        const data = await res.json();
-        if (data && data.success && Array.isArray(data.pendingPayments)) {
-          setPendingPayments(data.pendingPayments);
-        }
-      }
-    } catch {
-      // Silently maintain local pending payments
-    }
-  }, []);
-
-  // 3. Obtener paquetes de coins
-  const fetchPackages = useCallback(async () => {
-    try {
-      const res = await fetch('/api/packages');
-      if (res.ok) {
-        const data = await res.json();
-        if (data && data.success && Array.isArray(data.packages)) {
-          setPackages(data.packages);
-        }
-      }
-    } catch {
-      // Fallback to DEFAULT_PACKAGES
-    }
-  }, []);
-
+  // --- Sesión ---
   useEffect(() => {
-    refreshBalance();
-    fetchPendingPayments();
-    fetchPackages();
-
-    const interval = setInterval(() => {
-      refreshBalance();
-      fetchPendingPayments();
-    }, 12000);
-
-    return () => clearInterval(interval);
-  }, [refreshBalance, fetchPendingPayments, fetchPackages]);
-
-  // 4. Solicitar compra de ClicCoins (Yappy / Robux / PayPal)
-  const buyCoinsRequest = async (params: {
-    packageId?: string;
-    coins: number;
-    amountMoney: number;
-    paymentMethod: PaymentMethod;
-    paymentReference: string;
-    detalles?: string;
-  }) => {
-    setLoading(true);
-    const isInstant = params.paymentMethod === 'PayPal';
-
-    // Local fallback transaction
-    const localTx: ClicTransaction = {
-      id: `tx_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-      user_id: user.id,
-      username: user.username,
-      tipo: 'compra_coins',
-      cantidad_coins: params.coins,
-      monto_dinero_real: params.amountMoney,
-      metodo_pago: params.paymentMethod,
-      estado: isInstant ? 'completado' : 'pendiente',
-      referencia_pago: params.paymentReference,
-      detalles: params.detalles || `Recarga de ${params.coins} ClicCoins vía ${params.paymentMethod}`,
-      timestamp: new Date().toISOString(),
-      reviewed_at: isInstant ? new Date().toISOString() : undefined,
-      reviewed_by: isInstant ? 'Sistema_PayPal' : undefined,
-    };
-
-    try {
-      const res = await fetch('/api/coins/buy-request', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: user.id,
-          ...params,
-        }),
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        if (data.success) {
-          await refreshBalance();
-          await fetchPendingPayments();
-          return { success: true, message: data.message, transaction: data.transaction };
-        }
-      }
-    } catch {
-      // Backend request failed, apply locally for seamless UX
-    }
-
-    // Apply local state change
-    const updatedTx = [localTx, ...transactions];
-    const newBalance = isInstant ? balance + params.coins : balance;
-    const updatedUser = { ...user, cliccoins_balance: newBalance };
-
-    setUser(updatedUser);
-    setBalance(newBalance);
-    setTransactions(updatedTx);
-    if (!isInstant) {
-      setPendingPayments((prev) => [localTx, ...prev]);
-    }
-    persistState(updatedUser, updatedTx);
-    setLoading(false);
-
-    const msg = isInstant
-      ? `¡Pago completado! Se han acreditado ${params.coins.toLocaleString()} ClicCoins a tu cuenta.`
-      : `Solicitud registrada. Tu transacción (${localTx.id}) está en revisión por el equipo administrativo.`;
-
-    return { success: true, message: msg, transaction: localTx };
-  };
-
-  // 5. Simular captura automática de PayPal Webhook
-  const simulatePayPalCapture = async (orderId: string, coins: number, amountUsd: number) => {
-    return buyCoinsRequest({
-      coins,
-      amountMoney: amountUsd,
-      paymentMethod: 'PayPal',
-      paymentReference: orderId,
-      detalles: `Compra instantánea con PayPal Checkout (Orden: ${orderId})`,
+    const fb = firebase();
+    if (!fb) return;
+    return onAuthStateChanged(fb.auth, (u) => {
+      setFbUser(u);
+      setAuthReady(true);
     });
+  }, []);
+
+  const user: UserProfile | null = useMemo(() => {
+    if (!fbUser) return null;
+    const nombre = fbUser.displayName || (fbUser.email ? fbUser.email.split('@')[0] : 'Ciudadano');
+    return {
+      id: fbUser.uid,
+      username: nombre,
+      email: fbUser.email || '',
+      roblox_username: '',
+      cliccoins_balance: balance,
+      role: isAdmin ? 'admin' : 'user',
+      avatar: fbUser.photoURL || '/assets/brand/CLIC_MASTER_final-07_0791f7ab.webp',
+      created_at: fbUser.metadata.creationTime || '',
+    };
+  }, [fbUser, balance, isAdmin]);
+
+  // --- Catálogo del servidor (paquetes y datos de Yappy) ---
+  useEffect(() => {
+    llamarApi<any>('clicoins-catalogo', undefined, 'GET')
+      .then((c) => {
+        if (Array.isArray(c.paquetes)) {
+          setPackages(
+            c.paquetes.map((p: any) => ({
+              id: p.id,
+              coins: p.coins,
+              bonus: p.bonus || 0,
+              priceUsd: Number(p.precioUsd),
+              name: p.name,
+              tag: p.tag,
+              popular: p.popular,
+            }))
+          );
+        }
+        if (c.yappy) setYappyInfo(c.yappy);
+      })
+      .catch(() => {
+        /* se usan los paquetes locales */
+      });
+  }, []);
+
+  // --- Datos en vivo del usuario ---
+  useEffect(() => {
+    const fb = firebase();
+    if (!fb || !fbUser) {
+      setBalance(0);
+      setMovimientos([]);
+      setSolicitudes([]);
+      setBeneficios({});
+      return;
+    }
+    const uid = fbUser.uid;
+    const perfil = { id: uid, username: fbUser.displayName || fbUser.email || '' } as UserProfile;
+    const quitar = [
+      onSnapshot(doc(fb.db, 'wallets', uid), (s) => setBalance(s.exists() ? Number(s.data().balance || 0) : 0)),
+      onSnapshot(
+        query(collection(fb.db, 'wallets', uid, 'movimientos'), orderBy('fecha', 'desc'), limit(50)),
+        (s) => setMovimientos(s.docs.map((d) => movimientoATransaccion(d.id, d.data(), perfil)))
+      ),
+      onSnapshot(query(collection(fb.db, 'yappy_solicitudes'), where('uid', '==', uid)), (s) =>
+        setSolicitudes(s.docs.map((d) => ({ id: d.id, ...d.data() })))
+      ),
+      onSnapshot(doc(fb.db, 'beneficios', uid), (s) => setBeneficios(s.exists() ? s.data() : {})),
+    ];
+    return () => quitar.forEach((f) => f());
+  }, [fbUser]);
+
+  // --- ¿Es administrador? ---
+  useEffect(() => {
+    if (!fbUser) {
+      setIsAdmin(false);
+      return;
+    }
+    llamarApi<{ admin: boolean }>('clicoins-admin', { accion: 'yo' })
+      .then((r) => setIsAdmin(!!r.admin))
+      .catch(() => setIsAdmin(false));
+  }, [fbUser]);
+
+  // Historial: movimientos reales + recargas Yappy aún no aprobadas
+  const transactions: ClicTransaction[] = useMemo(() => {
+    const abiertas = solicitudes
+      .filter((s) => ['esperando-pago', 'pendiente', 'rechazada'].includes(s.estado))
+      .map((s) => solicitudATransaccion(s, user));
+    return [...abiertas, ...movimientos].sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+  }, [solicitudes, movimientos, user]);
+
+  const membresias = useMemo(() => {
+    const out: Record<string, number> = {};
+    for (const [k, v] of Object.entries<any>(beneficios.membresias || {})) {
+      out[k] = v && typeof v.toMillis === 'function' ? v.toMillis() : 0;
+    }
+    return out;
+  }, [beneficios]);
+
+  const items = useMemo(() => beneficios.items || {}, [beneficios]);
+
+  // --- Sesión: acciones ---
+  const conAuth = async (fn: () => Promise<unknown>, ok: string): Promise<Resultado> => {
+    if (!firebaseConfigurado) return { success: false, message: 'El inicio de sesión aún no está configurado.' };
+    try {
+      await fn();
+      return { success: true, message: ok };
+    } catch (e) {
+      return { success: false, message: mensajeAuth(e) };
+    }
+  };
+  const loginWithGoogle = () => conAuth(() => signInWithPopup(firebase()!.auth, new GoogleAuthProvider()), '¡Bienvenido!');
+  const loginWithEmail = (email: string, password: string) =>
+    conAuth(() => signInWithEmailAndPassword(firebase()!.auth, email.trim(), password), '¡Bienvenido!');
+  const registerWithEmail = (email: string, password: string) =>
+    conAuth(() => createUserWithEmailAndPassword(firebase()!.auth, email.trim(), password), '¡Cuenta creada!');
+  const resetPassword = (email: string) =>
+    conAuth(() => sendPasswordResetEmail(firebase()!.auth, email.trim()), 'Te enviamos un correo para cambiar tu contraseña.');
+  const logout = async () => {
+    const fb = firebase();
+    if (fb) await signOut(fb.auth);
   };
 
-  // 6. Comprar artículo de tienda con ClicCoins
-  const purchaseWithCoins = async (itemId: string, itemName: string, costCoins: number) => {
-    setLoading(true);
+  // --- Recargas ---
+  const paypalCreateOrder = async (packageId: string) => {
+    const r = await llamarApi<{ orderId: string }>('paypal-crear', { paqueteId: packageId });
+    return r.orderId;
+  };
 
-    if (balance < costCoins) {
-      setLoading(false);
+  const paypalCapture = async (orderId: string) => {
+    try {
+      const r = await llamarApi<any>('paypal-capturar', { orderId });
+      if (r.pendiente) return { success: true, pending: true, message: r.mensaje };
+      return {
+        success: true,
+        message: `¡Pago completado! Se acreditaron ${Number(r.coins).toLocaleString()} ClicCoins a tu cuenta.`,
+      };
+    } catch (e: any) {
+      return { success: false, message: e.message };
+    }
+  };
+
+  const yappyStart = (packageId: string) =>
+    llamarApi<YappySolicitud>('yappy-solicitud', { accion: 'iniciar', paqueteId: packageId });
+
+  const yappyConfirm = async (solicitudId: string, comprobante: string) => {
+    try {
+      const r = await llamarApi<any>('yappy-solicitud', { accion: 'confirmar', solicitudId, comprobante });
+      return { success: true, message: r.mensaje };
+    } catch (e: any) {
+      return { success: false, message: e.message };
+    }
+  };
+
+  const yappyCancel = async (solicitudId: string) => {
+    try {
+      await llamarApi('yappy-solicitud', { accion: 'cancelar', solicitudId });
+      return { success: true, message: 'Recarga cancelada.' };
+    } catch (e: any) {
+      return { success: false, message: e.message };
+    }
+  };
+
+  // --- Tienda ---
+  const priceOf = useCallback((itemId: string) => precioServidor(itemId) as number | null, []);
+
+  const purchaseWithCoins = async (
+    itemId: string,
+    itemName: string,
+    _costCoins: number,
+    extra?: { robloxUser?: string; discordUser?: string }
+  ) => {
+    if (!fbUser) {
+      setWalletOpen(true);
+      return { success: false, message: 'Inicia sesión para comprar con ClicCoins.' };
+    }
+    const precio = precioServidor(itemId);
+    if (precio === null) {
+      return { success: false, message: `${itemName} no está disponible para comprar con ClicCoins.` };
+    }
+    if (balance < precio) {
       return {
         success: false,
-        message: `Saldo insuficiente. Tienes ${balance.toLocaleString()} ClicCoins y el artículo cuesta ${costCoins.toLocaleString()} ClicCoins.`,
+        message: `Saldo insuficiente. Tienes ${balance.toLocaleString()} ClicCoins y el artículo cuesta ${precio.toLocaleString()} ClicCoins.`,
       };
     }
-
+    setLoading(true);
     try {
-      const res = await fetch('/api/shop/purchase', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: user.id,
-          itemId,
-          itemName,
-          costCoins,
-        }),
+      const r = await llamarApi<any>('clicoins-comprar', {
+        articuloId: itemId,
+        compraId: idAleatorio(),
+        robloxUser: extra?.robloxUser,
+        discordUser: extra?.discordUser,
       });
-
-      if (res.ok) {
-        const data = await res.json();
-        if (data.success) {
-          await refreshBalance();
-          setLoading(false);
-          return { success: true, message: data.message, newBalance: data.newBalance };
-        }
-      }
-    } catch {
-      // Backend unavailable, perform atomic deduction locally
+      return {
+        success: true,
+        message: `¡Compra exitosa! Adquiriste ${r.articulo} por ${Number(r.precioCoins).toLocaleString()} ClicCoins. El staff lo entregará en tu cuenta.`,
+        newBalance: r.saldo,
+      };
+    } catch (e: any) {
+      return { success: false, message: e.message };
+    } finally {
+      setLoading(false);
     }
-
-    const newBal = balance - costCoins;
-    const purchaseTx: ClicTransaction = {
-      id: `tx_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-      user_id: user.id,
-      username: user.username,
-      tipo: 'gasto_tienda',
-      cantidad_coins: costCoins,
-      monto_dinero_real: 0,
-      metodo_pago: 'Sistema',
-      estado: 'completado',
-      referencia_pago: `SHOP-${itemId.toUpperCase()}`,
-      detalles: `Compra en tienda: ${itemName}`,
-      timestamp: new Date().toISOString(),
-      reviewed_at: new Date().toISOString(),
-      reviewed_by: 'Sistema_Tienda_RP',
-    };
-
-    const updatedTx = [purchaseTx, ...transactions];
-    const updatedUser = { ...user, cliccoins_balance: newBal };
-
-    setUser(updatedUser);
-    setBalance(newBal);
-    setTransactions(updatedTx);
-    persistState(updatedUser, updatedTx);
-    setLoading(false);
-
-    return {
-      success: true,
-      message: `¡Compra exitosa! Has adquirido ${itemName} por ${costCoins.toLocaleString()} ClicCoins.`,
-      newBalance: newBal,
-    };
   };
 
-  // 7. Aprobar pago pendiente (Admin)
-  const approvePayment = async (transactionId: string) => {
-    try {
-      const res = await fetch(`/api/admin/approve-payment/${transactionId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ adminUsername: user.username }),
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        if (data.success) {
-          await refreshBalance();
-          await fetchPendingPayments();
-          return { success: true, message: data.message };
-        }
-      }
-    } catch {
-      // fallback locally
-    }
-
-    // Local approval
-    const tx = transactions.find((t) => t.id === transactionId);
-    const addedCoins = tx ? tx.cantidad_coins : 500;
-    const newBal = balance + addedCoins;
-    const updatedTx = transactions.map((t) =>
-      t.id === transactionId
-        ? { ...t, estado: 'completado' as TransactionStatus, reviewed_at: new Date().toISOString(), reviewed_by: user.username }
-        : t
-    );
-    const updatedUser = { ...user, cliccoins_balance: newBal };
-
-    setUser(updatedUser);
-    setBalance(newBal);
-    setTransactions(updatedTx);
-    setPendingPayments((prev) => prev.filter((t) => t.id !== transactionId));
-    persistState(updatedUser, updatedTx);
-
-    return {
-      success: true,
-      message: `Pago ${transactionId} aprobado con éxito. Se acreditaron ${addedCoins.toLocaleString()} ClicCoins.`,
-    };
+  // --- Admin ---
+  const adminListPayments = async (estado: 'pendiente' | 'esperando-pago' | 'aprobada' | 'rechazada') => {
+    const r = await llamarApi<any>('clicoins-admin', { accion: 'yappy-listar', estado });
+    return (r.solicitudes || []).map((s: any) => solicitudATransaccion(s));
   };
 
-  // 8. Rechazar pago pendiente (Admin)
-  const rejectPayment = async (transactionId: string, reason?: string) => {
-    const defaultReason = reason || 'Comprobante no válido o pago no recibido';
-    try {
-      const res = await fetch(`/api/admin/reject-payment/${transactionId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          adminUsername: user.username,
-          reason: defaultReason,
-        }),
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        if (data.success) {
-          await refreshBalance();
-          await fetchPendingPayments();
-          return { success: true, message: data.message };
-        }
-      }
-    } catch {
-      // fallback locally
+  const fetchPendingPayments = useCallback(async () => {
+    if (!isAdmin) {
+      setPendingPayments([]);
+      return;
     }
+    try {
+      const r = await llamarApi<any>('clicoins-admin', { accion: 'yappy-listar', estado: 'pendiente' });
+      setPendingPayments((r.solicitudes || []).map((s: any) => solicitudATransaccion(s)));
+    } catch {
+      /* se reintenta en el próximo ciclo */
+    }
+  }, [isAdmin]);
 
-    const updatedTx = transactions.map((t) =>
-      t.id === transactionId
-        ? {
-            ...t,
-            estado: 'rechazado' as TransactionStatus,
-            rejection_reason: defaultReason,
-            reviewed_at: new Date().toISOString(),
-            reviewed_by: user.username,
-          }
-        : t
-    );
+  useEffect(() => {
+    fetchPendingPayments();
+    if (!isAdmin) return;
+    const t = setInterval(fetchPendingPayments, 30000);
+    return () => clearInterval(t);
+  }, [isAdmin, fetchPendingPayments]);
 
-    setTransactions(updatedTx);
-    setPendingPayments((prev) => prev.filter((t) => t.id !== transactionId));
-    persistState(user, updatedTx);
-
-    return {
-      success: true,
-      message: `Pago ${transactionId} rechazado. Motivo: ${defaultReason}`,
-    };
+  const accionAdmin = async (cuerpo: any, ok: string): Promise<Resultado> => {
+    try {
+      const r = await llamarApi<any>('clicoins-admin', cuerpo);
+      await fetchPendingPayments();
+      return { success: true, message: typeof ok === 'string' ? ok : r.message };
+    } catch (e: any) {
+      return { success: false, message: e.message };
+    }
   };
 
-  // 9. Alternar rol de usuario/admin
-  const toggleAdminRole = async () => {
-    const newRole = user.role === 'admin' ? 'user' : 'admin';
-    try {
-      await fetch('/api/user/toggle-role', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: user.id,
-          role: newRole,
-        }),
-      });
-    } catch {
-      // ignore
-    }
+  const approvePayment = (id: string) => accionAdmin({ accion: 'yappy-aprobar', solicitudId: id }, 'Pago aprobado y ClicCoins acreditadas.');
+  const rejectPayment = (id: string, reason?: string) =>
+    accionAdmin({ accion: 'yappy-rechazar', solicitudId: id, motivo: reason || 'Pago no encontrado' }, 'Solicitud rechazada.');
 
-    const updatedUser = { ...user, role: newRole as 'user' | 'admin' };
-    setUser(updatedUser);
-    persistState(updatedUser, transactions);
+  const adminListOrders = async (estado: 'por-entregar' | 'entregado') => {
+    const r = await llamarApi<any>('clicoins-admin', { accion: 'pedidos-listar', estado });
+    return r.pedidos as Pedido[];
   };
+  const adminMarkDelivered = (pedidoId: string) =>
+    accionAdmin({ accion: 'pedido-entregado', pedidoId }, 'Pedido marcado como entregado.');
+  const adminAdjust = async (email: string, amount: number, reason: string) => {
+    try {
+      const r = await llamarApi<any>('clicoins-admin', { accion: 'ajustar', email, monto: amount, motivo: reason });
+      return { success: true, message: `Listo. Nuevo saldo de ${email}: ${Number(r.saldo).toLocaleString()} ClicCoins.` };
+    } catch (e: any) {
+      return { success: false, message: e.message };
+    }
+  };
+
+  // El saldo se actualiza solo (en vivo); se deja por compatibilidad
+  const refreshBalance = async () => {};
 
   return (
     <ClicCoinsContext.Provider
       value={{
+        configurado: firebaseConfigurado,
+        authReady,
         user,
+        loginWithGoogle,
+        loginWithEmail,
+        registerWithEmail,
+        resetPassword,
+        logout,
         balance,
         transactions,
-        pendingPayments,
         packages,
+        membresias,
+        items,
+        yappyInfo,
         loading,
-        isAdmin: user.role === 'admin',
         walletOpen,
         setWalletOpen,
         adminPanelOpen,
         setAdminPanelOpen,
-        refreshBalance,
-        fetchPendingPayments,
-        buyCoinsRequest,
-        simulatePayPalCapture,
+        paypalCreateOrder,
+        paypalCapture,
+        yappyStart,
+        yappyConfirm,
+        yappyCancel,
+        priceOf,
         purchaseWithCoins,
+        isAdmin,
+        pendingPayments,
+        fetchPendingPayments,
+        adminListPayments,
         approvePayment,
         rejectPayment,
-        toggleAdminRole,
+        adminListOrders,
+        adminMarkDelivered,
+        adminAdjust,
+        refreshBalance,
       }}
     >
       {children}
@@ -604,3 +565,10 @@ export const useClicCoins = (): ClicCoinsContextType => {
   }
   return context;
 };
+
+// Nombres legibles de las membresías (para "Mi cuenta")
+export const NOMBRES_MEMBRESIAS: Record<string, string> = Object.fromEntries(
+  Object.values(ARTICULOS as Record<string, any>)
+    .filter((a) => a.tipo === 'membresia')
+    .map((a) => [a.membresia, a.nombre.replace(/\s*\(.*\)\s*$/, '')])
+);

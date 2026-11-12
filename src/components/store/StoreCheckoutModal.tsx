@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { X, Check, ShieldCheck, ShoppingBag, Sparkles, Truck, Gift, Coins } from 'lucide-react';
 import { useClicCoins } from '../../context/ClicCoinsContext.tsx';
 import confetti from 'canvas-confetti';
@@ -21,22 +21,27 @@ interface StoreCheckoutModalProps {
 }
 
 export const StoreCheckoutModal: React.FC<StoreCheckoutModalProps> = ({ item, onClose }) => {
-  const { balance, purchaseWithCoins, setWalletOpen } = useClicCoins();
-  const [buyerName, setBuyerName] = useState('Carlos Rodriguez');
-  const [robloxUser, setRobloxUser] = useState('Rodriguez_Capo');
-  const [discordTag, setDiscordTag] = useState('CarlosRP#2026');
-  const [email, setEmail] = useState('carlos@clicmaster.lat');
+  const { balance, purchaseWithCoins, setWalletOpen, priceOf, user } = useClicCoins();
+  const [buyerName, setBuyerName] = useState('');
+  const [robloxUser, setRobloxUser] = useState('');
+  const [discordTag, setDiscordTag] = useState('');
+  const [email, setEmail] = useState('');
   const [shippingAddress, setShippingAddress] = useState('');
-  const [country, setCountry] = useState('México');
+  const [country, setCountry] = useState('Panamá');
   const [isProcessing, setIsProcessing] = useState(false);
   const [completed, setCompleted] = useState(false);
   const [paymentMode, setPaymentMode] = useState<'ClicCoins' | 'Robux'>('ClicCoins');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (user?.email && !email) setEmail(user.email);
+  }, [user]);
+
   if (!item) return null;
 
   const isPhysical = item.type === 'physical' || item.type === 'pack';
-  const numericPrice = parseInt(item.price.replace(/\D/g, ''), 10) || 350;
+  // Precio en ClicCoins definido en api/_lib/precios.js (el mismo que cobra el servidor)
+  const numericPrice = priceOf(item.id) ?? (parseInt(item.price.replace(/\D/g, ''), 10) || 350);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,7 +56,10 @@ export const StoreCheckoutModal: React.FC<StoreCheckoutModalProps> = ({ item, on
       }
 
       setIsProcessing(true);
-      const res = await purchaseWithCoins(item.id, item.name, numericPrice);
+      const res = await purchaseWithCoins(item.id, item.name, numericPrice, {
+        robloxUser: robloxUser.trim(),
+        discordUser: discordTag.trim(),
+      });
       setIsProcessing(false);
 
       if (res.success) {
@@ -67,16 +75,14 @@ export const StoreCheckoutModal: React.FC<StoreCheckoutModalProps> = ({ item, on
       return;
     }
 
-    setIsProcessing(true);
-    setTimeout(() => {
-      setIsProcessing(false);
-      setCompleted(true);
-      confetti({
-        particleCount: 130,
-        spread: 90,
-        origin: { y: 0.6 },
-      });
-    }, 900);
+    // Merch físico y Robux todavía no se cobran en la web
+    if (isPhysical) {
+      setErrorMessage(
+        'La venta de merch físico y packs abrirá muy pronto. Mientras tanto escríbenos por Discord para apartar el tuyo.'
+      );
+    } else {
+      setErrorMessage('Las compras con Robux se hacen dentro del juego en Roblox. Aquí en la web puedes pagar con ClicCoins.');
+    }
   };
 
   const handleResetAndClose = () => {
@@ -99,7 +105,7 @@ export const StoreCheckoutModal: React.FC<StoreCheckoutModalProps> = ({ item, on
                 CLICMASTER STORE · Finalizar Pedido
               </h3>
               <p className="text-xs text-neutral-500 dark:text-neutral-400">
-                Pasarela Oficial con Activación Automática
+                Pago con ClicCoins verificado en el servidor
               </p>
             </div>
           </div>
@@ -126,36 +132,18 @@ export const StoreCheckoutModal: React.FC<StoreCheckoutModalProps> = ({ item, on
 
               <p className="text-sm text-neutral-600 dark:text-neutral-300 max-w-md mx-auto">
                 Gracias <span className="font-bold">{buyerName || 'Ciudadano'}</span>. Tu compra de{' '}
-                <span className="font-bold text-[#1f7c0f] dark:text-[#7CFF3A]">{item.name}</span> ha sido procesada.
+                <span className="font-bold text-[#1f7c0f] dark:text-[#7CFF3A]">{item.name}</span> fue pagada con ClicCoins.
               </p>
 
-              {/* Order dossier */}
               <div className="p-4 rounded-2xl bg-neutral-50 dark:bg-neutral-850 text-xs text-neutral-600 dark:text-neutral-300 border border-neutral-200 dark:border-neutral-800 text-left space-y-2">
-                <div className="flex items-center justify-between pb-2 border-b border-neutral-200/60 dark:border-neutral-700/60">
-                  <span className="font-semibold text-neutral-500">Orden de Compra:</span>
-                  <span className="font-mono font-bold text-neutral-900 dark:text-white">
-                    #STORE-2026-{Math.floor(100000 + Math.random() * 900000)}
-                  </span>
-                </div>
                 <div className="flex items-center justify-between">
                   <span className="text-neutral-500">Usuario Roblox:</span>
-                  <span className="font-semibold text-neutral-800 dark:text-neutral-200 font-mono">
-                    @{robloxUser || 'CLIC_Player'}
-                  </span>
+                  <span className="font-semibold text-neutral-800 dark:text-neutral-200 font-mono">@{robloxUser || '—'}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-neutral-500">Beneficio Discord:</span>
-                  <span className="font-bold text-[#5865F2]">Rol Exclusivo Asignado</span>
+                  <span className="text-neutral-500">Entrega:</span>
+                  <span className="font-bold text-[#5865F2]">El staff lo entregará en tu cuenta</span>
                 </div>
-                {isPhysical && (
-                  <div className="flex items-center justify-between pt-1 text-emerald-600 dark:text-emerald-400 font-semibold">
-                    <span className="flex items-center gap-1.5">
-                      <Truck className="w-3.5 h-3.5" />
-                      <span>Envío a Domicilio:</span>
-                    </span>
-                    <span>Preparando despacho (3-5 días)</span>
-                  </div>
-                )}
               </div>
 
               <div className="pt-2">
@@ -183,21 +171,15 @@ export const StoreCheckoutModal: React.FC<StoreCheckoutModalProps> = ({ item, on
                       {item.category}
                     </span>
                     {item.selectedSize && (
-                      <span className="text-[10px] font-bold text-neutral-500">
-                        Talla: {item.selectedSize}
-                      </span>
+                      <span className="text-[10px] font-bold text-neutral-500">Talla: {item.selectedSize}</span>
                     )}
                     {item.selectedColor && (
-                      <span className="text-[10px] font-bold text-neutral-500">
-                        Color: {item.selectedColor}
-                      </span>
+                      <span className="text-[10px] font-bold text-neutral-500">Color: {item.selectedColor}</span>
                     )}
                   </div>
-                  <h4 className="text-sm font-black text-neutral-900 dark:text-white truncate mt-0.5">
-                    {item.name}
-                  </h4>
+                  <h4 className="text-sm font-black text-neutral-900 dark:text-white truncate mt-0.5">{item.name}</h4>
                   <div className="text-sm font-black text-[#1a6b0c] dark:text-[#7CFF3A] tabular-nums">
-                    {item.price}
+                    {isPhysical ? item.price : `${numericPrice.toLocaleString()} ClicCoins`}
                   </div>
                 </div>
               </div>
@@ -247,22 +229,24 @@ export const StoreCheckoutModal: React.FC<StoreCheckoutModalProps> = ({ item, on
                       <span className="font-black text-amber-500">{balance.toLocaleString()} ClicCoins</span>
                     </div>
                   )}
+                </div>
+              )}
 
-                  {errorMessage && (
-                    <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-xs text-red-600 dark:text-red-400 space-y-2">
-                      <p className="font-bold">{errorMessage}</p>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          handleResetAndClose();
-                          setWalletOpen(true);
-                        }}
-                        className="w-full py-2 px-3 rounded-lg bg-amber-500 hover:bg-amber-600 text-[#121212] font-black text-xs flex items-center justify-center gap-1.5 transition-colors"
-                      >
-                        <Coins className="w-3.5 h-3.5" />
-                        <span>Recargar ClicCoins (PayPal / Yappy / Robux)</span>
-                      </button>
-                    </div>
+              {errorMessage && (
+                <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-xs text-red-600 dark:text-red-400 space-y-2">
+                  <p className="font-bold">{errorMessage}</p>
+                  {!isPhysical && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleResetAndClose();
+                        setWalletOpen(true);
+                      }}
+                      className="w-full py-2 px-3 rounded-lg bg-amber-500 hover:bg-amber-600 text-[#121212] font-black text-xs flex items-center justify-center gap-1.5 transition-colors"
+                    >
+                      <Coins className="w-3.5 h-3.5" />
+                      <span>Recargar ClicCoins (PayPal / Yappy)</span>
+                    </button>
                   )}
                 </div>
               )}
@@ -282,7 +266,7 @@ export const StoreCheckoutModal: React.FC<StoreCheckoutModalProps> = ({ item, on
                 />
               </div>
 
-              {/* Grid: Roblox & Discord for automated role/item delivery */}
+              {/* Grid: Roblox & Discord for role/item delivery */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-neutral-700 dark:text-neutral-300 mb-1">
@@ -304,8 +288,7 @@ export const StoreCheckoutModal: React.FC<StoreCheckoutModalProps> = ({ item, on
                   </label>
                   <input
                     type="text"
-                    required
-                    placeholder="Ej: mateo#1234"
+                    placeholder="Ej: mateo_rp"
                     value={discordTag}
                     onChange={(e) => setDiscordTag(e.target.value)}
                     className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-sm focus:outline-none focus:ring-2 focus:ring-[#7CFF3A] dark:text-white"
@@ -346,6 +329,7 @@ export const StoreCheckoutModal: React.FC<StoreCheckoutModalProps> = ({ item, on
                         onChange={(e) => setCountry(e.target.value)}
                         className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-sm focus:outline-none focus:ring-2 focus:ring-[#7CFF3A] dark:text-white"
                       >
+                        <option>Panamá</option>
                         <option>México</option>
                         <option>Colombia</option>
                         <option>Argentina</option>
@@ -364,7 +348,7 @@ export const StoreCheckoutModal: React.FC<StoreCheckoutModalProps> = ({ item, on
                       <input
                         type="text"
                         required
-                        placeholder="Calle, Número, Colonia, Ciudad"
+                        placeholder="Calle, Número, Ciudad"
                         value={shippingAddress}
                         onChange={(e) => setShippingAddress(e.target.value)}
                         className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-sm focus:outline-none focus:ring-2 focus:ring-[#7CFF3A] dark:text-white"
@@ -374,10 +358,9 @@ export const StoreCheckoutModal: React.FC<StoreCheckoutModalProps> = ({ item, on
                 </div>
               )}
 
-              {/* Guarantee badge */}
               <div className="flex items-center gap-2 text-xs text-neutral-500 dark:text-neutral-400">
                 <ShieldCheck className="w-4 h-4 text-emerald-500 shrink-0" />
-                <span>Garantía de entrega oficial CLICMASTER · Transacción encriptada</span>
+                <span>El cobro en ClicCoins se verifica en el servidor de CLICMASTER</span>
               </div>
 
               <button
@@ -395,7 +378,8 @@ export const StoreCheckoutModal: React.FC<StoreCheckoutModalProps> = ({ item, on
                       <ShoppingBag className="w-4 h-4" />
                     )}
                     <span>
-                      Confirmar Compra ({!isPhysical && paymentMode === 'ClicCoins' ? `${numericPrice.toLocaleString()} ClicCoins` : item.price})
+                      Confirmar Compra (
+                      {!isPhysical && paymentMode === 'ClicCoins' ? `${numericPrice.toLocaleString()} ClicCoins` : item.price})
                     </span>
                   </>
                 )}

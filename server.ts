@@ -1,7 +1,7 @@
 import express, { Request, Response, NextFunction } from 'express';
 import path from 'node:path';
 import fs from 'node:fs';
-import { apiRouter } from './src/server/routes.ts';
+import { pathToFileURL } from 'node:url';
 
 const app = express();
 
@@ -30,11 +30,26 @@ app.use((_req: Request, res: Response, next: NextFunction) => {
 
 // Health check endpoint
 app.get('/api/health', (_req: Request, res: Response) => {
-  res.json({ status: 'ok', service: 'CLICMaster Virtual Economy API', version: '2026.1' });
+  res.json({ status: 'ok', service: 'CLICMaster ClicCoins API', version: '2026.2' });
 });
 
-// Mount the ClicCoins Virtual Economy API routes
-app.use('/api', apiRouter);
+// ClicCoins: las funciones viven en la carpeta api/ (en Vercel se publican solas).
+// Aquí se montan también para la vista previa local / AI Studio.
+const apiDir = path.resolve(process.cwd(), 'api');
+if (fs.existsSync(apiDir)) {
+  for (const file of fs.readdirSync(apiDir)) {
+    if (!file.endsWith('.js')) continue;
+    const nombre = file.replace(/\.js$/, '');
+    app.all(`/api/${nombre}`, async (req: Request, res: Response) => {
+      try {
+        const mod = await import(pathToFileURL(path.join(apiDir, file)).href);
+        await mod.default(req, res);
+      } catch (err: any) {
+        if (!res.headersSent) res.status(500).json({ error: err?.message || 'Error interno del servidor' });
+      }
+    });
+  }
+}
 
 // Global error handler for API routes
 app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {

@@ -17,7 +17,8 @@ export async function usuarioDesdePeticion(req) {
   try {
     const u = await adminAuth.verifyIdToken(token);
     return { uid: u.uid, email: u.email || '', emailVerificado: !!u.email_verified, claims: u };
-  } catch {
+  } catch (e) {
+    if (e && e.publico) throw e; // falta configuración en el servidor
     throw new ErrorUsuario('Tu sesión expiró, vuelve a iniciar sesión', 401);
   }
 }
@@ -51,9 +52,9 @@ export function manejador(metodos, fn) {
       const resultado = await fn(req, res);
       if (!res.headersSent) res.status(200).json({ ok: true, ...resultado });
     } catch (e) {
-      const status = e instanceof ErrorUsuario ? e.status : 500;
-      if (status === 500) console.error('[clicoins]', e);
-      const mensaje = status === 500 ? 'Error interno, intenta de nuevo' : e.message;
+      const status = e instanceof ErrorUsuario ? e.status : e && e.publico ? e.status || 503 : 500;
+      if (!(e instanceof ErrorUsuario)) console.error('[clicoins]', e);
+      const mensaje = e instanceof ErrorUsuario ? e.message : e && e.publico ? e.publico : 'Error interno, intenta de nuevo';
       if (!res.headersSent) res.status(status).json({ error: mensaje });
     }
   };

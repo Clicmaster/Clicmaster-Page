@@ -10,7 +10,12 @@ const BASE =
 async function tokenAcceso() {
   const id = process.env.PAYPAL_CLIENT_ID;
   const secreto = process.env.PAYPAL_CLIENT_SECRET;
-  if (!id || !secreto) throw new Error('Faltan PAYPAL_CLIENT_ID o PAYPAL_CLIENT_SECRET en Vercel');
+  if (!id || !secreto) {
+    const e = new Error('Faltan PAYPAL_CLIENT_ID o PAYPAL_CLIENT_SECRET en Vercel');
+    e.status = 503;
+    e.publico = 'Los pagos con PayPal aún no están activados.';
+    throw e;
+  }
   const r = await fetch(`${BASE}/v1/oauth2/token`, {
     method: 'POST',
     headers: {

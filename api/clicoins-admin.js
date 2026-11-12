@@ -35,7 +35,11 @@ export default manejador(['POST'], async (req) => {
   const admin = await usuarioDesdePeticion(req);
   const cuerpo = leerCuerpo(req);
 
-  if (cuerpo.accion === 'yo') return { admin: esAdmin(admin) };
+  if (cuerpo.accion === 'yo') {
+    const resultado = esAdmin(admin);
+    console.log('[clicoins] admin?', { email: admin.email, verificado: admin.emailVerificado, admin: resultado });
+    return { admin: resultado, email: admin.email, verificado: admin.emailVerificado };
+  }
   if (!esAdmin(admin)) throw new ErrorUsuario('No autorizado', 403);
 
   switch (cuerpo.accion) {

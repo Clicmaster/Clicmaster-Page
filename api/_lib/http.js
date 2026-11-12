@@ -19,6 +19,7 @@ export async function usuarioDesdePeticion(req) {
     return { uid: u.uid, email: u.email || '', emailVerificado: !!u.email_verified, claims: u };
   } catch (e) {
     if (e && e.publico) throw e; // falta configuración en el servidor
+    console.error('[clicoins] token rechazado:', e && (e.code || e.message));
     throw new ErrorUsuario('Tu sesión expiró, vuelve a iniciar sesión', 401);
   }
 }

@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import type { Request, Response, NextFunction } from 'express';
-import { db, PublicUser } from './db.ts';
+import { getStore, PublicUser, UserFacingError } from './db.js';
 
 // ============================================================================
 // CLAVE SECRETA PARA FIRMAR LAS SESIONES
@@ -11,6 +11,12 @@ import { db, PublicUser } from './db.ts';
 const SESSION_SECRET: string = (() => {
   const fromEnv = process.env.SESSION_SECRET;
   if (fromEnv && fromEnv.length >= 32) return fromEnv;
+  if (process.env.VERCEL) {
+    // En Vercel hay varias copias del servidor: una clave temporal haría que las
+    // sesiones fallen al azar. Mejor no iniciar sesiones hasta configurarla.
+    console.error('[CLICMaster] FALTA SESSION_SECRET en Vercel: el inicio de sesión está desactivado.');
+    return '';
+  }
   console.warn(
     '[CLICMaster] AVISO: SESSION_SECRET no está configurada (o tiene menos de 32 caracteres). ' +
       'Se usará una clave temporal; las sesiones se cerrarán al reiniciar el servidor.'
@@ -46,6 +52,9 @@ export function safeEqual(a: string, b: string): boolean {
 // TOKENS DE SESIÓN FIRMADOS (formato: userId.expiración.firma)
 // ============================================================================
 function sign(payload: string): string {
+  if (!SESSION_SECRET) {
+    throw new UserFacingError('El inicio de sesión no está configurado todavía. Intenta más tarde.', 503);
+  }
   return crypto.createHmac('sha256', SESSION_SECRET).update(payload).digest('base64url');
 }
 
@@ -60,7 +69,7 @@ export function readSessionToken(token: string): string | null {
   if (parts.length !== 3) return null;
   const [userPart, expiresPart, signature] = parts;
   const payload = `${userPart}.${expiresPart}`;
-  if (!safeEqual(sign(payload), signature)) return null;
+  if (!SESSION_SECRET || !safeEqual(sign(payload), signature)) return null;
   const expires = Number(expiresPart);
   if (!Number.isFinite(expires) || expires < Date.now()) return null;
   try {
@@ -85,28 +94,40 @@ function getTokenFromRequest(req: Request): string | null {
   return null;
 }
 
-export function requireAuth(req: AuthedRequest, res: Response, next: NextFunction): void {
+async function loadUser(req: AuthedRequest): Promise<PublicUser | undefined> {
   const token = getTokenFromRequest(req);
   const userId = token ? readSessionToken(token) : null;
-  const user = userId ? db.getPublicUser(userId) : undefined;
+  return userId ? getStore().getPublicUser(userId) : undefined;
+}
 
-  if (!user) {
-    res.status(401).json({ success: false, message: 'Debes iniciar sesión para continuar.' });
-    return;
-  }
-
-  req.user = user;
-  next();
+export function requireAuth(req: AuthedRequest, res: Response, next: NextFunction): void {
+  loadUser(req)
+    .then((user) => {
+      if (!user) {
+        res.status(401).json({ success: false, message: 'Debes iniciar sesión para continuar.' });
+        return;
+      }
+      req.user = user;
+      next();
+    })
+    .catch(next);
 }
 
 export function requireAdmin(req: AuthedRequest, res: Response, next: NextFunction): void {
-  requireAuth(req, res, () => {
-    if (req.user?.role !== 'admin') {
-      res.status(403).json({ success: false, message: 'No tienes permisos de administrador.' });
-      return;
-    }
-    next();
-  });
+  loadUser(req)
+    .then((user) => {
+      if (!user) {
+        res.status(401).json({ success: false, message: 'Debes iniciar sesión para continuar.' });
+        return;
+      }
+      if (user.role !== 'admin') {
+        res.status(403).json({ success: false, message: 'No tienes permisos de administrador.' });
+        return;
+      }
+      req.user = user;
+      next();
+    })
+    .catch(next);
 }
 
 // ============================================================================

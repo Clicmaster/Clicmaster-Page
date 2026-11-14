@@ -1,5 +1,5 @@
-import { Router, Request, Response } from 'express';
-import { db } from './db.ts';
+import { Router, Request, Response, NextFunction } from 'express';
+import { getStore, getPackage, normalizeReference, PACKAGES } from './db.js';
 import {
   AuthedRequest,
   createSessionToken,
@@ -9,10 +9,18 @@ import {
   requireAuth,
   safeEqual,
   verifyPassword,
-} from './auth.ts';
-import { COIN_SHOP_CATALOG } from '../data/coinShopCatalog.ts';
+} from './auth.js';
+import { COIN_SHOP_CATALOG } from '../data/coinShopCatalog.js';
 
 export const apiRouter = Router();
+
+/** Permite usar funciones async en Express: cualquier error va al manejador central. */
+type AsyncHandler = (req: AuthedRequest, res: Response, next: NextFunction) => Promise<void>;
+const wrap =
+  (fn: AsyncHandler) =>
+  (req: Request, res: Response, next: NextFunction): void => {
+    fn(req as AuthedRequest, res, next).catch(next);
+  };
 
 const FIFTEEN_MIN = 15 * 60 * 1000;
 const ONE_HOUR = 60 * 60 * 1000;
@@ -43,7 +51,9 @@ function tooManyAttempts(res: Response): void {
 // 1. REGISTRO DE CUENTA
 // POST /api/auth/register  { username, robloxUsername, password, adminCode? }
 // ============================================================================
-apiRouter.post('/auth/register', (req: Request, res: Response): void => {
+apiRouter.post(
+  '/auth/register',
+  wrap(async (req, res) => {
   if (!rateLimit(`register:${clientIp(req)}`, 5, ONE_HOUR)) return tooManyAttempts(res);
 
   const username = asText(req.body?.username);
@@ -78,20 +88,19 @@ apiRouter.post('/auth/register', (req: Request, res: Response): void => {
     role = 'admin';
   }
 
-  try {
-    const { hash, salt } = hashPassword(password);
-    const user = db.createUser({ username, robloxUsername, passwordHash: hash, passwordSalt: salt, role });
-    res.status(201).json({ success: true, token: createSessionToken(user.id), user });
-  } catch (error: any) {
-    res.status(400).json({ success: false, message: error.message });
-  }
-});
+  const { hash, salt } = hashPassword(password);
+  const user = await getStore().createUser({ username, robloxUsername, passwordHash: hash, passwordSalt: salt, role });
+  res.status(201).json({ success: true, token: createSessionToken(user.id), user });
+  })
+);
 
 // ============================================================================
 // 2. INICIAR SESIÓN
 // POST /api/auth/login  { username, password }
 // ============================================================================
-apiRouter.post('/auth/login', (req: Request, res: Response): void => {
+apiRouter.post(
+  '/auth/login',
+  wrap(async (req, res) => {
   const username = asText(req.body?.username);
   const password = typeof req.body?.password === 'string' ? req.body.password : '';
 
@@ -102,7 +111,7 @@ apiRouter.post('/auth/login', (req: Request, res: Response): void => {
     return tooManyAttempts(res);
   }
 
-  const stored = username ? db.findUserByUsername(username) : undefined;
+  const stored = username ? await getStore().findUserByUsername(username) : undefined;
   let valid = false;
   if (stored?.password_hash && stored.password_salt) {
     valid = verifyPassword(password, stored.password_hash, stored.password_salt);
@@ -117,30 +126,35 @@ apiRouter.post('/auth/login', (req: Request, res: Response): void => {
     return;
   }
 
-  const user = db.getPublicUser(stored.id)!;
+  const user = (await getStore().getPublicUser(stored.id))!;
   res.json({ success: true, token: createSessionToken(user.id), user });
-});
+  })
+);
 
 // ============================================================================
 // 3. DATOS DE MI CUENTA, SALDO E HISTORIAL (requiere sesión)
 // GET /api/user/balance
 // ============================================================================
-apiRouter.get('/user/balance', requireAuth, (req: AuthedRequest, res: Response): void => {
-  const user = req.user!;
-  res.json({
-    success: true,
-    user,
-    balance: user.cliccoins_balance,
-    transactions: db.getUserTransactions(user.id),
-  });
-});
+apiRouter.get(
+  '/user/balance',
+  requireAuth,
+  wrap(async (req, res) => {
+    const user = req.user!;
+    res.json({
+      success: true,
+      user,
+      balance: user.cliccoins_balance,
+      transactions: await getStore().getUserTransactions(user.id),
+    });
+  })
+);
 
 // ============================================================================
 // 4. PAQUETES DISPONIBLES DE CLICCOINS (público)
 // GET /api/packages
 // ============================================================================
 apiRouter.get('/packages', (_req: Request, res: Response): void => {
-  res.json({ success: true, packages: db.getPackages() });
+  res.json({ success: true, packages: PACKAGES });
 });
 
 // ============================================================================
@@ -148,7 +162,10 @@ apiRouter.get('/packages', (_req: Request, res: Response): void => {
 // POST /api/coins/buy-request  { packageId, paymentMethod, paymentReference }
 // Las monedas y el precio los calcula el servidor según el paquete.
 // ============================================================================
-apiRouter.post('/coins/buy-request', requireAuth, (req: AuthedRequest, res: Response): void => {
+apiRouter.post(
+  '/coins/buy-request',
+  requireAuth,
+  wrap(async (req, res) => {
   const user = req.user!;
   if (!rateLimit(`buy:${user.id}`, 10, ONE_HOUR)) return tooManyAttempts(res);
 
@@ -164,7 +181,12 @@ apiRouter.post('/coins/buy-request', requireAuth, (req: AuthedRequest, res: Resp
     return;
   }
 
-  if (!REFERENCE_RE.test(paymentReference)) {
+  if (!getPackage(packageId)) {
+    res.status(400).json({ success: false, message: 'El paquete seleccionado no existe.' });
+    return;
+  }
+
+  if (!REFERENCE_RE.test(paymentReference) || normalizeReference(paymentReference).length < 4) {
     res.status(400).json({
       success: false,
       message: 'El número de comprobante debe tener de 4 a 64 caracteres (letras, números y guiones).',
@@ -172,32 +194,32 @@ apiRouter.post('/coins/buy-request', requireAuth, (req: AuthedRequest, res: Resp
     return;
   }
 
-  try {
-    const transaction = db.createBuyRequest({
-      userId: user.id,
-      packageId,
-      paymentMethod,
-      paymentReference,
-    });
+  const transaction = await getStore().createBuyRequest({
+    userId: user.id,
+    packageId,
+    paymentMethod,
+    paymentReference,
+  });
 
-    res.status(201).json({
-      success: true,
-      transaction,
-      balance: db.getPublicUser(user.id)?.cliccoins_balance ?? 0,
-      message: `Solicitud registrada. Tu transacción (${transaction.id}) está en revisión por el equipo administrativo.`,
-    });
-  } catch (error: any) {
-    res.status(400).json({ success: false, message: error.message });
-  }
-});
+  res.status(201).json({
+    success: true,
+    transaction,
+    balance: user.cliccoins_balance,
+    message: `Solicitud registrada. Tu transacción (${transaction.id}) está en revisión por el equipo administrativo.`,
+  });
+  })
+);
 
 // ============================================================================
 // 6. PANEL ADMIN: SOLICITUDES DE RECARGA (solo administradores)
 // GET /api/admin/pending-payments
 // ============================================================================
-apiRouter.get('/admin/pending-payments', requireAdmin, (_req: AuthedRequest, res: Response): void => {
-  const pendingPayments = db.getPendingTransactions();
-  const requests = db.getPurchaseRequests();
+apiRouter.get(
+  '/admin/pending-payments',
+  requireAdmin,
+  wrap(async (_req, res) => {
+  const store = getStore();
+  const [pendingPayments, requests] = await Promise.all([store.getPendingTransactions(), store.getPurchaseRequests()]);
 
   res.json({
     success: true,
@@ -212,45 +234,49 @@ apiRouter.get('/admin/pending-payments', requireAdmin, (_req: AuthedRequest, res
       robuxPending: pendingPayments.filter((t) => t.metodo_pago === 'Robux').length,
     },
   });
-});
+  })
+);
 
 // ============================================================================
 // 7. APROBAR PAGO (solo administradores)
 // POST /api/admin/approve-payment/:id
 // ============================================================================
-apiRouter.post('/admin/approve-payment/:id', requireAdmin, (req: AuthedRequest, res: Response): void => {
-  try {
-    const transaction = db.approvePayment(req.params.id, req.user!.username);
+apiRouter.post(
+  '/admin/approve-payment/:id',
+  requireAdmin,
+  wrap(async (req, res) => {
+    const transaction = await getStore().approvePayment(req.params.id, req.user!.username);
     res.json({
       success: true,
       message: `Pago aprobado. Se acreditaron ${transaction.cantidad_coins} ClicCoins a ${transaction.username}.`,
       transaction,
     });
-  } catch (error: any) {
-    res.status(400).json({ success: false, message: error.message });
-  }
-});
+  })
+);
 
 // ============================================================================
 // 8. RECHAZAR PAGO (solo administradores)
 // POST /api/admin/reject-payment/:id  { reason }
 // ============================================================================
-apiRouter.post('/admin/reject-payment/:id', requireAdmin, (req: AuthedRequest, res: Response): void => {
-  const reason = asText(req.body?.reason).slice(0, 300) || 'Comprobante no válido o pago no recibido';
-  try {
-    const transaction = db.rejectPayment(req.params.id, reason, req.user!.username);
+apiRouter.post(
+  '/admin/reject-payment/:id',
+  requireAdmin,
+  wrap(async (req, res) => {
+    const reason = asText(req.body?.reason).slice(0, 300) || 'Comprobante no válido o pago no recibido';
+    const transaction = await getStore().rejectPayment(req.params.id, reason, req.user!.username);
     res.json({ success: true, message: `Pago rechazado. Motivo: ${reason}`, transaction });
-  } catch (error: any) {
-    res.status(400).json({ success: false, message: error.message });
-  }
-});
+  })
+);
 
 // ============================================================================
 // 9. COMPRAR EN LA TIENDA CON CLICCOINS (requiere sesión)
 // POST /api/shop/purchase  { itemId }
 // El precio sale del catálogo oficial del servidor, no del navegador.
 // ============================================================================
-apiRouter.post('/shop/purchase', requireAuth, (req: AuthedRequest, res: Response): void => {
+apiRouter.post(
+  '/shop/purchase',
+  requireAuth,
+  wrap(async (req, res) => {
   const user = req.user!;
   if (!rateLimit(`shop:${user.id}`, 30, ONE_HOUR)) return tooManyAttempts(res);
 
@@ -262,24 +288,21 @@ apiRouter.post('/shop/purchase', requireAuth, (req: AuthedRequest, res: Response
     return;
   }
 
-  try {
-    const result = db.processShopPurchase({
-      userId: user.id,
-      itemId: item.id,
-      itemName: item.name,
-      costCoins: item.costCoins,
-    });
-    res.json({
-      success: true,
-      message: `¡Compra exitosa! Has adquirido ${item.name} por ${item.costCoins} ClicCoins.`,
-      newBalance: result.newBalance,
-      transaction: result.transaction,
-      purchase: result.purchase,
-    });
-  } catch (error: any) {
-    res.status(400).json({ success: false, message: error.message });
-  }
-});
+  const result = await getStore().processShopPurchase({
+    userId: user.id,
+    itemId: item.id,
+    itemName: item.name,
+    costCoins: item.costCoins,
+  });
+  res.json({
+    success: true,
+    message: `¡Compra exitosa! Has adquirido ${item.name} por ${item.costCoins} ClicCoins.`,
+    newBalance: result.newBalance,
+    transaction: result.transaction,
+    purchase: result.purchase,
+  });
+  })
+);
 
 // Cualquier otra ruta /api que no exista
 apiRouter.use((_req: Request, res: Response) => {

@@ -3,9 +3,9 @@
 // Esta es la ÚNICA fuente de precios que usa el servidor para cobrar.
 // Si cambias un precio aquí, cambia tanto en la página como en el cobro real.
 // ============================================================================
-import { SHOP_ITEMS } from './serverData.ts';
-import { VIRTUAL_PRODUCTS } from './storeProducts.ts';
-import type { ShopItem } from '../types/index.ts';
+import { SHOP_ITEMS } from './serverData.js';
+import { VIRTUAL_PRODUCTS } from './storeProducts.js';
+import type { ShopItem } from '../types/index.js';
 
 export interface CoinShopEntry {
   id: string;

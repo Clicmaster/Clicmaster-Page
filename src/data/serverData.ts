@@ -8,11 +8,11 @@ import {
   ShopItem,
 } from '../types/index.ts';
 
-export const HERO_IMAGE = '/src/assets/images/clicmaster_hero_city_1793308351652.webp';
-export const POLICE_IMAGE = '/src/assets/images/clicmaster_police_dept_1793308351382.webp';
-export const HOSPITAL_IMAGE = '/src/assets/images/clicmaster_hospital_ems_1793308352910.webp';
-export const FIRE_IMAGE = '/src/assets/images/clicmaster_fire_rescue_1793308352964.webp';
-export const DEALERSHIP_IMAGE = '/src/assets/images/clicmaster_luxury_dealership_1793308352753.webp';
+export const HERO_IMAGE = '/assets/images/clicmaster_hero_city_1793308351652.webp';
+export const POLICE_IMAGE = '/assets/images/clicmaster_police_dept_1793308351382.webp';
+export const HOSPITAL_IMAGE = '/assets/images/clicmaster_hospital_ems_1793308352910.webp';
+export const FIRE_IMAGE = '/assets/images/clicmaster_fire_rescue_1793308352964.webp';
+export const DEALERSHIP_IMAGE = '/assets/images/clicmaster_luxury_dealership_1793308352753.webp';
 export const DESFILE_VILLA_LOS_SANTOS_IMAGE = '/assets/events/desfile_villa_los_santos.webp';
 
 export const SERVER_METRICS = {

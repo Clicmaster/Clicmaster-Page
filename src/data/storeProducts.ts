@@ -8,16 +8,16 @@
 // ============================================================================
 
 // Roblox in-game screenshot style virtual store items
-export const ROBLOX_VIP_PASS = '/src/assets/images/roblox_vip_pass_1794365858806.jpg';
-export const ROBLOX_POLICE_TACTICAL = '/src/assets/images/roblox_police_tactical_1794365859519.jpg';
-export const ROBLOX_DOCTOR_SCRUBS = '/src/assets/images/roblox_doctor_scrubs_1794365860261.jpg';
-export const ROBLOX_FIREFIGHTER_GEAR = '/src/assets/images/roblox_firefighter_gear_1794365861409.jpg';
-export const ROBLOX_TACTICAL_BACKPACK = '/src/assets/images/roblox_tactical_backpack_1794365861993.jpg';
-export const ROBLOX_CYBER_WINGS = '/src/assets/images/roblox_cyber_wings_1794365862985.jpg';
-export const ROBLOX_GOLD_BADGE = '/src/assets/images/roblox_gold_badge_1794365864178.jpg';
-export const ROBLOX_SF90_SUPERCAR = '/src/assets/images/roblox_sf90_supercar_1794365864979.jpg';
-export const ROBLOX_PATROL_HELICOPTER = '/src/assets/images/roblox_patrol_helicopter_1794365867069.jpg';
-export const ROBLOX_LUXURY_MANSION = '/src/assets/images/roblox_luxury_mansion_1794365865198.jpg';
+export const ROBLOX_VIP_PASS = '/assets/images/roblox_vip_pass_1794365858806.jpg';
+export const ROBLOX_POLICE_TACTICAL = '/assets/images/roblox_police_tactical_1794365859519.jpg';
+export const ROBLOX_DOCTOR_SCRUBS = '/assets/images/roblox_doctor_scrubs_1794365860261.jpg';
+export const ROBLOX_FIREFIGHTER_GEAR = '/assets/images/roblox_firefighter_gear_1794365861409.jpg';
+export const ROBLOX_TACTICAL_BACKPACK = '/assets/images/roblox_tactical_backpack_1794365861993.jpg';
+export const ROBLOX_CYBER_WINGS = '/assets/images/roblox_cyber_wings_1794365862985.jpg';
+export const ROBLOX_GOLD_BADGE = '/assets/images/roblox_gold_badge_1794365864178.jpg';
+export const ROBLOX_SF90_SUPERCAR = '/assets/images/roblox_sf90_supercar_1794365864979.jpg';
+export const ROBLOX_PATROL_HELICOPTER = '/assets/images/roblox_patrol_helicopter_1794365867069.jpg';
+export const ROBLOX_LUXURY_MANSION = '/assets/images/roblox_luxury_mansion_1794365865198.jpg';
 
 export interface VirtualProduct {
   id: string;
@@ -124,10 +124,10 @@ export const VIRTUAL_PRODUCTS: VirtualProduct[] = [
 ];
 
 // High quality WebP optimized images for Merch
-export const MERCH_HOODIE = '/src/assets/images/clicmaster_merch_hoodie_1794100557771.webp';
-export const MERCH_CAP = '/src/assets/images/clicmaster_merch_cap_1794100558380.webp';
-export const MERCH_MOUSEPAD = '/src/assets/images/clicmaster_merch_mousepad_1794100559849.webp';
-export const MERCH_LIFESTYLE = '/src/assets/images/clicmaster_merch_lifestyle_1794100560331.webp';
+export const MERCH_HOODIE = '/assets/images/clicmaster_merch_hoodie_1794100557771.webp';
+export const MERCH_CAP = '/assets/images/clicmaster_merch_cap_1794100558380.webp';
+export const MERCH_MOUSEPAD = '/assets/images/clicmaster_merch_mousepad_1794100559849.webp';
+export const MERCH_LIFESTYLE = '/assets/images/clicmaster_merch_lifestyle_1794100560331.webp';
 
 export interface PhysicalProduct {
   id: string;

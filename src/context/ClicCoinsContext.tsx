@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { PACKAGES, type CoinPackage } from '../data/coinPackages.ts';
 
 export type PaymentMethod = 'Yappy' | 'PayPal' | 'Robux' | 'Sistema';
 export type TransactionStatus = 'pendiente' | 'completado' | 'rechazado';
@@ -33,16 +34,7 @@ export interface ClicTransaction {
   rejection_reason?: string;
 }
 
-export interface CoinPackage {
-  id: string;
-  coins: number;
-  bonus: number;
-  priceUsd: number;
-  priceRobux: number;
-  name: string;
-  tag?: string;
-  popular?: boolean;
-}
+export type { CoinPackage };
 
 type ActionResult = { success: boolean; message: string };
 
@@ -84,24 +76,8 @@ interface ClicCoinsContextType {
   rejectPayment: (transactionId: string, reason?: string) => Promise<ActionResult>;
 }
 
-// Paquetes que se muestran mientras carga la información del servidor.
-// (Solo para mostrar: el precio real lo decide siempre el servidor.)
-const DEFAULT_PACKAGES: CoinPackage[] = [
-  { id: 'pack-100', coins: 100, bonus: 0, priceUsd: 1.99, priceRobux: 80, name: 'Pack Básico', tag: 'Iniciación' },
-  {
-    id: 'pack-500',
-    coins: 500,
-    bonus: 50,
-    priceUsd: 7.99,
-    priceRobux: 350,
-    name: 'Pack Ciudadano',
-    tag: 'Popular',
-    popular: true,
-  },
-  { id: 'pack-1000', coins: 1000, bonus: 150, priceUsd: 14.99, priceRobux: 650, name: 'Pack Élite', tag: 'Recomendado' },
-  { id: 'pack-2500', coins: 2500, bonus: 500, priceUsd: 29.99, priceRobux: 1400, name: 'Pack Magnate', tag: 'Gran Ahorro' },
-  { id: 'pack-5000', coins: 5000, bonus: 1250, priceUsd: 49.99, priceRobux: 2500, name: 'Pack Imperio', tag: 'VIP Máximo' },
-];
+// Los paquetes vienen de la lista oficial compartida con el servidor.
+const DEFAULT_PACKAGES: CoinPackage[] = PACKAGES;
 
 // En el navegador solo se guarda el "pase" de sesión, nunca el saldo.
 const TOKEN_KEY = 'clicmaster_session';

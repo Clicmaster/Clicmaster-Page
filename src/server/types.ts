@@ -4,6 +4,10 @@
 // archivo JSON (solo para pruebas en tu computadora).
 // ============================================================================
 import crypto from 'node:crypto';
+import { PACKAGES, type CoinPackage } from '../data/coinPackages.js';
+
+export { PACKAGES };
+export type { CoinPackage };
 
 export type TransactionTipo = 'compra_coins' | 'gasto_tienda' | 'bonificacion' | 'reembolso';
 export type PaymentMetodo = 'Yappy' | 'PayPal' | 'Robux' | 'Sistema';
@@ -57,17 +61,6 @@ export interface ShopPurchase {
   timestamp: string;
 }
 
-export interface CoinPackage {
-  id: string;
-  coins: number;
-  bonus: number;
-  priceUsd: number;
-  priceRobux: number;
-  name: string;
-  tag?: string;
-  popular?: boolean;
-}
-
 export interface BuyRequestParams {
   userId: string;
   packageId: string;
@@ -112,23 +105,6 @@ export const DEFAULT_AVATAR = '/assets/brand/CLIC_MASTER_final-07_0791f7ab.webp'
 
 /** Máximo de solicitudes de recarga "en revisión" que puede tener un usuario a la vez. */
 export const MAX_PENDING_PER_USER = 3;
-
-export const PACKAGES: CoinPackage[] = [
-  { id: 'pack-100', coins: 100, bonus: 0, priceUsd: 1.99, priceRobux: 80, name: 'Pack Básico', tag: 'Iniciación' },
-  {
-    id: 'pack-500',
-    coins: 500,
-    bonus: 50,
-    priceUsd: 7.99,
-    priceRobux: 350,
-    name: 'Pack Ciudadano',
-    tag: 'Popular',
-    popular: true,
-  },
-  { id: 'pack-1000', coins: 1000, bonus: 150, priceUsd: 14.99, priceRobux: 650, name: 'Pack Élite', tag: 'Recomendado' },
-  { id: 'pack-2500', coins: 2500, bonus: 500, priceUsd: 29.99, priceRobux: 1400, name: 'Pack Magnate', tag: 'Gran Ahorro' },
-  { id: 'pack-5000', coins: 5000, bonus: 1250, priceUsd: 49.99, priceRobux: 2500, name: 'Pack Imperio', tag: 'VIP Máximo' },
-];
 
 export function getPackage(packageId: string): CoinPackage | undefined {
   return PACKAGES.find((p) => p.id === packageId);

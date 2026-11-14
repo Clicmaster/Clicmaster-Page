@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useClicCoins, PaymentMethod, CoinPackage } from '../../context/ClicCoinsContext.tsx';
+import { useClicCoins, CoinPackage } from '../../context/ClicCoinsContext.tsx';
 import {
   Coins,
   X,
@@ -14,9 +14,8 @@ import {
   ExternalLink,
   History,
   ShoppingBag,
-  Zap,
+  LogOut,
 } from 'lucide-react';
-import confetti from 'canvas-confetti';
 
 export const ClicCoinsWalletModal: React.FC = () => {
   const {
@@ -28,16 +27,14 @@ export const ClicCoinsWalletModal: React.FC = () => {
     setWalletOpen,
     setAdminPanelOpen,
     buyCoinsRequest,
-    simulatePayPalCapture,
     isAdmin,
-    toggleAdminRole,
+    logout,
   } = useClicCoins();
 
   const [activeTab, setActiveTab] = useState<'comprar' | 'historial' | 'cuenta'>('comprar');
   const [selectedPackage, setSelectedPackage] = useState<CoinPackage | null>(null);
-  const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>('PayPal');
+  const [selectedMethod, setSelectedMethod] = useState<'Yappy' | 'Robux'>('Yappy');
   const [referenceNumber, setReferenceNumber] = useState('');
-  const [robloxUsernameInput, setRobloxUsernameInput] = useState(user?.roblox_username || 'Rodriguez_Capo');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [notification, setNotification] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(
     null
@@ -64,34 +61,6 @@ export const ClicCoinsWalletModal: React.FC = () => {
 
   const totalCoinsInPkg = currentPkg.coins + currentPkg.bonus;
 
-  const handlePayPalSubmit = async () => {
-    setIsSubmitting(true);
-    setNotification(null);
-
-    try {
-      const fakeOrderId = `PAYPAL-ORD-${Math.floor(1000000 + Math.random() * 9000000)}`;
-      const res = await simulatePayPalCapture(fakeOrderId, totalCoinsInPkg, currentPkg.priceUsd);
-
-      if (res.success) {
-        confetti({
-          particleCount: 100,
-          spread: 70,
-          origin: { y: 0.6 },
-        });
-        setNotification({
-          type: 'success',
-          message: `¡Pago de $${currentPkg.priceUsd} USD procesado con éxito! Se acreditaron ${totalCoinsInPkg.toLocaleString()} ClicCoins a tu saldo al instante.`,
-        });
-      } else {
-        setNotification({ type: 'error', message: res.message });
-      }
-    } catch (err: any) {
-      setNotification({ type: 'error', message: err.message || 'Error en PayPal' });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
   const handleManualPaymentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!referenceNumber.trim()) {
@@ -105,27 +74,19 @@ export const ClicCoinsWalletModal: React.FC = () => {
     setIsSubmitting(true);
     setNotification(null);
 
-    const price = selectedMethod === 'Robux' ? currentPkg.priceRobux : currentPkg.priceUsd;
-    const details =
-      selectedMethod === 'Yappy'
-        ? `Pago móvil Yappy a CLICMASTER LATAM INC (+507 6829-4411) por ${totalCoinsInPkg} ClicCoins`
-        : `Gamepass oficial en Roblox adquirido por usuario @${robloxUsernameInput} (${currentPkg.priceRobux} Robux)`;
-
     try {
       const res = await buyCoinsRequest({
         packageId: currentPkg.id,
-        coins: totalCoinsInPkg,
-        amountMoney: price,
         paymentMethod: selectedMethod,
         paymentReference: referenceNumber.trim(),
-        detalles: details,
       });
 
       if (res.success) {
+        const sentReference = referenceNumber.trim();
         setReferenceNumber('');
         setNotification({
           type: 'info',
-          message: `¡Solicitud registrada! La transacción con referencia ${referenceNumber} quedó en estado "En Revisión". Nuestro equipo administrativo la validará en 5-15 minutos.`,
+          message: `¡Solicitud registrada! La transacción con referencia ${sentReference} quedó "En Revisión". Recibirás tus ClicCoins cuando un administrador confirme el pago.`,
         });
         setActiveTab('historial');
       } else {
@@ -225,7 +186,7 @@ export const ClicCoinsWalletModal: React.FC = () => {
             }`}
           >
             <ShieldCheck className="w-4 h-4" />
-            <span>Mi Cuenta & Admin</span>
+            <span>{isAdmin ? 'Mi Cuenta & Admin' : 'Mi Cuenta'}</span>
           </button>
         </div>
 
@@ -332,14 +293,11 @@ export const ClicCoinsWalletModal: React.FC = () => {
                 </h4>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  {/* PayPal (Automático) */}
+                  {/* PayPal: desactivado hasta conectar la verificación real con PayPal */}
                   <div
-                    onClick={() => setSelectedMethod('PayPal')}
-                    className={`p-4 rounded-2xl border cursor-pointer transition-all duration-200 flex items-center gap-3.5 ${
-                      selectedMethod === 'PayPal'
-                        ? 'border-[#0070BA] ring-2 ring-[#0070BA]/25 bg-[#0070BA]/5 dark:bg-[#0070BA]/10'
-                        : 'border-neutral-200 dark:border-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-700 bg-white dark:bg-neutral-900'
-                    }`}
+                    aria-disabled="true"
+                    title="PayPal estará disponible próximamente"
+                    className="p-4 rounded-2xl border transition-all duration-200 flex items-center gap-3.5 border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 opacity-50 cursor-not-allowed"
                   >
                     <div className="w-10 h-10 rounded-xl bg-[#0070BA]/15 text-[#0070BA] font-black text-sm flex items-center justify-center shrink-0">
                       PP
@@ -347,11 +305,11 @@ export const ClicCoinsWalletModal: React.FC = () => {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5">
                         <span className="text-sm font-black text-neutral-900 dark:text-white">PayPal</span>
-                        <span className="px-1.5 py-0.5 text-[9px] font-black rounded-md bg-[#0070BA] text-white">
-                          Automático
+                        <span className="px-1.5 py-0.5 text-[9px] font-black rounded-md bg-neutral-500 text-white">
+                          Próximamente
                         </span>
                       </div>
-                      <p className="text-[11px] text-neutral-500 truncate">Acreditación instantánea</p>
+                      <p className="text-[11px] text-neutral-500 truncate">Aún no disponible</p>
                     </div>
                   </div>
 
@@ -405,43 +363,6 @@ export const ClicCoinsWalletModal: React.FC = () => {
 
               {/* Step 3: Checkout Action Form */}
               <div className="p-5 rounded-2xl bg-neutral-50 dark:bg-neutral-900/60 border border-neutral-200 dark:border-neutral-800">
-                {selectedMethod === 'PayPal' && (
-                  <div className="space-y-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-neutral-200 dark:border-neutral-800">
-                      <div>
-                        <h5 className="text-sm font-black text-neutral-900 dark:text-white">
-                          Pago Instantáneo con PayPal Checkout
-                        </h5>
-                        <p className="text-xs text-neutral-500">
-                          Recibirás <strong className="text-neutral-900 dark:text-white">{totalCoinsInPkg.toLocaleString()} ClicCoins</strong> por{' '}
-                          <strong className="text-neutral-900 dark:text-white">${currentPkg.priceUsd} USD</strong>.
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <span className="text-xs text-neutral-400">Total a pagar</span>
-                        <div className="text-2xl font-black text-[#0070BA]">${currentPkg.priceUsd} USD</div>
-                      </div>
-                    </div>
-
-                    <div className="pt-2 flex flex-col sm:flex-row gap-3">
-                      <button
-                        onClick={handlePayPalSubmit}
-                        disabled={isSubmitting}
-                        className="flex-1 py-3.5 px-6 rounded-xl bg-[#0070BA] hover:bg-[#005ea6] text-white font-extrabold text-sm flex items-center justify-center gap-2 shadow-md transition-colors disabled:opacity-50"
-                      >
-                        <CreditCard className="w-4 h-4" />
-                        <span>
-                          {isSubmitting ? 'Procesando pago con PayPal...' : `Pagar $${currentPkg.priceUsd} USD con PayPal`}
-                        </span>
-                      </button>
-                    </div>
-
-                    <p className="text-[11px] text-neutral-400 text-center">
-                      🔒 Pago cifrado protegido por PayPal. La confirmación por webhook acredita tus ClicCoins de forma instantánea en tu cuenta.
-                    </p>
-                  </div>
-                )}
-
                 {selectedMethod === 'Yappy' && (
                   <form onSubmit={handleManualPaymentSubmit} className="space-y-4">
                     <div className="flex flex-col md:flex-row gap-5 pb-4 border-b border-neutral-200 dark:border-neutral-800">
@@ -528,27 +449,13 @@ export const ClicCoinsWalletModal: React.FC = () => {
                       </div>
 
                       <div className="flex-1 text-xs text-neutral-500 dark:text-neutral-400 space-y-1.5 justify-center flex flex-col">
-                        <p>1. Compra el Gamepass correspondiente en Roblox.</p>
-                        <p>2. Ingresa tu usuario de Roblox con el que hiciste la compra.</p>
-                        <p>3. Pega el ID de transacción o fecha de compra para validar.</p>
+                        <p>1. Compra el Gamepass correspondiente en Roblox con tu cuenta <strong>@{user?.roblox_username}</strong>.</p>
+                        <p>2. Pega abajo el ID de transacción de la compra.</p>
+                        <p>3. Un administrador verificará la compra y te acreditará las ClicCoins.</p>
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-xs font-bold text-neutral-700 dark:text-neutral-300 mb-1">
-                          Tu Usuario de Roblox *
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          value={robloxUsernameInput}
-                          onChange={(e) => setRobloxUsernameInput(e.target.value)}
-                          placeholder="Ej: Rodriguez_Capo"
-                          className="w-full px-4 py-2.5 rounded-xl border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#67F23B]"
-                        />
-                      </div>
-
+                    <div className="grid grid-cols-1 gap-3">
                       <div>
                         <label className="block text-xs font-bold text-neutral-700 dark:text-neutral-300 mb-1">
                           ID de Transacción / Comprobante Roblox *
@@ -682,7 +589,7 @@ export const ClicCoinsWalletModal: React.FC = () => {
                           </span>
                           {tx.monto_dinero_real > 0 && (
                             <div className="text-[10px] text-neutral-400">
-                              {tx.metodo_pago === 'Robux'
+                              {tx.moneda === 'ROBUX' || tx.metodo_pago === 'Robux'
                                 ? `${tx.monto_dinero_real} Robux`
                                 : `$${tx.monto_dinero_real} USD`}
                             </div>
@@ -729,23 +636,22 @@ export const ClicCoinsWalletModal: React.FC = () => {
                 </div>
 
                 <div className="pt-3 border-t border-neutral-200 dark:border-neutral-800 flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <span className="text-xs text-neutral-500">Alternar rol para pruebas del sistema:</span>
-                    <p className="text-[11px] text-neutral-400">
-                      Permite testear el flujo como usuario común o como Administrador con permisos de aprobación.
-                    </p>
-                  </div>
+                  <p className="text-[11px] text-neutral-400">
+                    Cuenta creada el {user ? new Date(user.created_at).toLocaleDateString('es-PA') : ''}
+                  </p>
 
                   <button
-                    onClick={toggleAdminRole}
-                    className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-neutral-200 dark:bg-neutral-800 hover:bg-neutral-300 dark:hover:bg-neutral-700 transition-colors"
+                    onClick={logout}
+                    className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-neutral-200 dark:bg-neutral-800 hover:bg-neutral-300 dark:hover:bg-neutral-700 transition-colors flex items-center gap-1.5"
                   >
-                    Cambiar a {isAdmin ? 'Usuario Normal' : 'Administrador'}
+                    <LogOut className="w-3.5 h-3.5" />
+                    <span>Cerrar sesión</span>
                   </button>
                 </div>
               </div>
 
-              {/* Panel Admin Shortcut */}
+              {/* Panel Admin Shortcut (solo administradores) */}
+              {isAdmin && (
               <div className="p-5 rounded-2xl bg-neutral-900 text-white border border-neutral-800 flex items-center justify-between gap-4">
                 <div>
                   <div className="flex items-center gap-2">
@@ -767,6 +673,7 @@ export const ClicCoinsWalletModal: React.FC = () => {
                   Abrir Panel Admin
                 </button>
               </div>
+              )}
             </div>
           )}
         </div>

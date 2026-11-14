@@ -20,7 +20,7 @@ export const AdminPaymentsModal: React.FC = () => {
     adminPanelOpen,
     setAdminPanelOpen,
     pendingPayments,
-    transactions,
+    adminRequests: transactions,
     approvePayment,
     rejectPayment,
   } = useClicCoins();
@@ -315,7 +315,9 @@ export const AdminPaymentsModal: React.FC = () => {
                         +{tx.cantidad_coins.toLocaleString()} 🪙
                       </div>
                       <div className="text-xs font-bold text-neutral-500">
-                        {tx.metodo_pago === 'Robux' ? `${tx.monto_dinero_real} Robux` : `$${tx.monto_dinero_real} USD`}
+                        {tx.moneda === 'ROBUX' || tx.metodo_pago === 'Robux'
+                          ? `${tx.monto_dinero_real} Robux`
+                          : `$${tx.monto_dinero_real} USD`}
                       </div>
                     </div>
 

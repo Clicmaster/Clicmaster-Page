@@ -6,3 +6,7 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Base de datos real (saldos, usuarios y contraseñas cifradas): nunca subirla a GitHub
+/data/
+*.corrupto-*

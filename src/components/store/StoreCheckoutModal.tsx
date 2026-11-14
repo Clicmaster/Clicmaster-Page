@@ -21,11 +21,12 @@ interface StoreCheckoutModalProps {
 }
 
 export const StoreCheckoutModal: React.FC<StoreCheckoutModalProps> = ({ item, onClose }) => {
-  const { balance, purchaseWithCoins, setWalletOpen } = useClicCoins();
-  const [buyerName, setBuyerName] = useState('Carlos Rodriguez');
-  const [robloxUser, setRobloxUser] = useState('Rodriguez_Capo');
-  const [discordTag, setDiscordTag] = useState('CarlosRP#2026');
-  const [email, setEmail] = useState('carlos@clicmaster.lat');
+  const { user, balance, purchaseWithCoins, setWalletOpen, setAuthOpen } = useClicCoins();
+  // Ya no se rellenan datos personales de ejemplo
+  const [buyerName, setBuyerName] = useState('');
+  const [robloxUser, setRobloxUser] = useState(user?.roblox_username || '');
+  const [discordTag, setDiscordTag] = useState('');
+  const [email, setEmail] = useState('');
   const [shippingAddress, setShippingAddress] = useState('');
   const [country, setCountry] = useState('México');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -43,6 +44,10 @@ export const StoreCheckoutModal: React.FC<StoreCheckoutModalProps> = ({ item, on
     setErrorMessage(null);
 
     if (!isPhysical && paymentMode === 'ClicCoins') {
+      if (!user) {
+        setAuthOpen(true);
+        return;
+      }
       if (balance < numericPrice) {
         setErrorMessage(
           `Saldo insuficiente. Tienes ${balance.toLocaleString()} ClicCoins y el ítem cuesta ${numericPrice.toLocaleString()} ClicCoins.`
@@ -51,7 +56,7 @@ export const StoreCheckoutModal: React.FC<StoreCheckoutModalProps> = ({ item, on
       }
 
       setIsProcessing(true);
-      const res = await purchaseWithCoins(item.id, item.name, numericPrice);
+      const res = await purchaseWithCoins(item.id);
       setIsProcessing(false);
 
       if (res.success) {
@@ -67,16 +72,17 @@ export const StoreCheckoutModal: React.FC<StoreCheckoutModalProps> = ({ item, on
       return;
     }
 
-    setIsProcessing(true);
-    setTimeout(() => {
-      setIsProcessing(false);
-      setCompleted(true);
-      confetti({
-        particleCount: 130,
-        spread: 90,
-        origin: { y: 0.6 },
-      });
-    }, 900);
+    // Antes aquí se mostraba "Pedido confirmado" sin cobrar ni guardar nada.
+    // Hasta tener un cobro real, se le dice la verdad al comprador.
+    if (isPhysical) {
+      setErrorMessage(
+        'Los pedidos de mercancía física aún no se pueden pagar en la web. Escríbenos en nuestro Discord oficial para hacer tu pedido.'
+      );
+    } else {
+      setErrorMessage(
+        'El pago directo con Robux no está disponible en la web. Recarga ClicCoins con Robux desde tu billetera y luego compra con ClicCoins.'
+      );
+    }
   };
 
   const handleResetAndClose = () => {
@@ -260,7 +266,7 @@ export const StoreCheckoutModal: React.FC<StoreCheckoutModalProps> = ({ item, on
                         className="w-full py-2 px-3 rounded-lg bg-amber-500 hover:bg-amber-600 text-[#121212] font-black text-xs flex items-center justify-center gap-1.5 transition-colors"
                       >
                         <Coins className="w-3.5 h-3.5" />
-                        <span>Recargar ClicCoins (PayPal / Yappy / Robux)</span>
+                        <span>Recargar ClicCoins (Yappy / Robux)</span>
                       </button>
                     </div>
                   )}
@@ -371,6 +377,13 @@ export const StoreCheckoutModal: React.FC<StoreCheckoutModalProps> = ({ item, on
                       />
                     </div>
                   </div>
+                </div>
+              )}
+
+              {/* Aviso para pedidos físicos */}
+              {isPhysical && errorMessage && (
+                <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs font-bold text-amber-800 dark:text-amber-400">
+                  {errorMessage}
                 </div>
               )}
 

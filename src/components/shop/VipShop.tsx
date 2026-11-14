@@ -4,12 +4,12 @@ import { ShopItem } from '../../types/index.ts';
 import { ShoppingBag, Check, Sparkles, X, ShieldCheck, Zap, Coins, CreditCard } from 'lucide-react';
 import { useClicCoins } from '../../context/ClicCoinsContext.tsx';
 import confetti from 'canvas-confetti';
+import { getVipItemCoinCost } from '../../data/coinShopCatalog.ts';
 
 export const VipShop: React.FC = () => {
-  const { balance, purchaseWithCoins, setWalletOpen } = useClicCoins();
+  const { user, balance, purchaseWithCoins, setWalletOpen, setAuthOpen } = useClicCoins();
   const [selectedCategory, setSelectedCategory] = useState<string>('Todos');
   const [checkoutItem, setCheckoutItem] = useState<ShopItem | null>(null);
-  const [robloxUsername, setRobloxUsername] = useState('Rodriguez_Capo');
   const [purchaseSuccess, setPurchaseSuccess] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentMode, setPaymentMode] = useState<'ClicCoins' | 'Robux'>('ClicCoins');
@@ -22,19 +22,21 @@ export const VipShop: React.FC = () => {
       ? SHOP_ITEMS
       : SHOP_ITEMS.filter((item) => item.category === selectedCategory);
 
-  const getCoinsCost = (item: ShopItem) => {
-    return item.priceRobux || 500;
-  };
+  // Mismo precio que cobra el servidor (catálogo oficial)
+  const getCoinsCost = (item: ShopItem) => getVipItemCoinCost(item);
 
   const handleCheckout = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!robloxUsername.trim()) return;
     if (!checkoutItem) return;
 
     setErrorMessage(null);
     const coinsCost = getCoinsCost(checkoutItem);
 
     if (paymentMode === 'ClicCoins') {
+      if (!user) {
+        setAuthOpen(true);
+        return;
+      }
       if (balance < coinsCost) {
         setErrorMessage(
           `Saldo insuficiente. Tienes ${balance.toLocaleString()} ClicCoins y el ítem requiere ${coinsCost.toLocaleString()} ClicCoins.`
@@ -43,7 +45,7 @@ export const VipShop: React.FC = () => {
       }
 
       setIsProcessing(true);
-      const res = await purchaseWithCoins(checkoutItem.id, checkoutItem.title, coinsCost);
+      const res = await purchaseWithCoins(checkoutItem.id);
       setIsProcessing(false);
 
       if (res.success) {
@@ -57,17 +59,11 @@ export const VipShop: React.FC = () => {
         setErrorMessage(res.message);
       }
     } else {
-      // Robux mode simulation
-      setIsProcessing(true);
-      setTimeout(() => {
-        setIsProcessing(false);
-        setPurchaseSuccess(true);
-        confetti({
-          particleCount: 120,
-          spread: 90,
-          origin: { y: 0.5 },
-        });
-      }, 900);
+      // Antes aquí se simulaba una compra exitosa sin cobrar nada.
+      // El pago con Robux se hace en Roblox: recarga ClicCoins con Robux y luego compra aquí.
+      setErrorMessage(
+        'El pago directo con Robux no está disponible en la web. Recarga ClicCoins con Robux desde tu billetera y luego compra con ClicCoins.'
+      );
     }
   };
 
@@ -249,7 +245,7 @@ export const VipShop: React.FC = () => {
                     ¡Entrega Confirmada con Éxito!
                   </h4>
                   <p className="text-sm text-neutral-600 dark:text-neutral-300">
-                    Tu ítem <span className="font-bold">{checkoutItem.title}</span> ha sido vinculado a la cuenta de Roblox <span className="font-mono font-bold text-[#2B6BFF]">@{robloxUsername}</span>. Descontado de tu saldo de ClicCoins.
+                    Tu ítem <span className="font-bold">{checkoutItem.title}</span> quedó registrado para la cuenta de Roblox <span className="font-mono font-bold text-[#2B6BFF]">@{user?.roblox_username}</span>. Se descontó de tu saldo de ClicCoins.
                   </p>
                   <div className="p-4 rounded-xl bg-neutral-50 dark:bg-neutral-800 text-xs font-mono text-neutral-600 dark:text-neutral-400 border border-neutral-200 dark:border-neutral-700">
                     ID Transacción: SHOP-{checkoutItem.id.toUpperCase()}-{Date.now()}
@@ -330,23 +326,16 @@ export const VipShop: React.FC = () => {
                         className="w-full py-2 px-3 rounded-lg bg-amber-500 hover:bg-amber-600 text-[#121212] font-black text-xs flex items-center justify-center gap-1.5 transition-colors"
                       >
                         <Coins className="w-3.5 h-3.5" />
-                        <span>Recargar ClicCoins (PayPal / Yappy / Robux)</span>
+                        <span>Recargar ClicCoins (Yappy / Robux)</span>
                       </button>
                     </div>
                   )}
 
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-neutral-700 dark:text-neutral-300 mb-1.5">
-                      Usuario de Roblox para la Entrega
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="Ej: Rodriguez_Capo"
-                      value={robloxUsername}
-                      onChange={(e) => setRobloxUsername(e.target.value)}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-sm focus:outline-none focus:ring-2 focus:ring-[#67F23B] dark:text-white font-medium"
-                    />
+                  <div className="text-xs text-neutral-600 dark:text-neutral-400">
+                    Entrega a la cuenta de Roblox:{' '}
+                    <span className="font-mono font-bold text-neutral-900 dark:text-white">
+                      {user ? `@${user.roblox_username}` : 'inicia sesión para comprar'}
+                    </span>
                   </div>
 
                   <div className="flex items-center gap-2 text-xs text-neutral-600 dark:text-neutral-400">

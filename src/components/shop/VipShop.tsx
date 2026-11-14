@@ -12,8 +12,8 @@ export const VipShop: React.FC = () => {
   const [checkoutItem, setCheckoutItem] = useState<ShopItem | null>(null);
   const [purchaseSuccess, setPurchaseSuccess] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [paymentMode, setPaymentMode] = useState<'ClicCoins' | 'Robux'>('ClicCoins');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [orderId, setOrderId] = useState<string | null>(null);
 
   const categories = ['Todos', 'VIP', 'Vehículos', 'Casas', 'Monedas'];
 
@@ -32,38 +32,32 @@ export const VipShop: React.FC = () => {
     setErrorMessage(null);
     const coinsCost = getCoinsCost(checkoutItem);
 
-    if (paymentMode === 'ClicCoins') {
-      if (!user) {
-        setAuthOpen(true);
-        return;
-      }
-      if (balance < coinsCost) {
-        setErrorMessage(
-          `Saldo insuficiente. Tienes ${balance.toLocaleString()} ClicCoins y el ítem requiere ${coinsCost.toLocaleString()} ClicCoins.`
-        );
-        return;
-      }
-
-      setIsProcessing(true);
-      const res = await purchaseWithCoins(checkoutItem.id);
-      setIsProcessing(false);
-
-      if (res.success) {
-        setPurchaseSuccess(true);
-        confetti({
-          particleCount: 140,
-          spread: 90,
-          origin: { y: 0.5 },
-        });
-      } else {
-        setErrorMessage(res.message);
-      }
-    } else {
-      // Antes aquí se simulaba una compra exitosa sin cobrar nada.
-      // El pago con Robux se hace en Roblox: recarga ClicCoins con Robux y luego compra aquí.
+    // Todo se paga SOLO con ClicCoins
+    if (!user) {
+      setAuthOpen(true);
+      return;
+    }
+    if (balance < coinsCost) {
       setErrorMessage(
-        'El pago directo con Robux no está disponible en la web. Recarga ClicCoins con Robux desde tu billetera y luego compra con ClicCoins.'
+        `Saldo insuficiente. Tienes ${balance.toLocaleString()} ClicCoins y el ítem requiere ${coinsCost.toLocaleString()} ClicCoins.`
       );
+      return;
+    }
+
+    setIsProcessing(true);
+    const res = await purchaseWithCoins(checkoutItem.id);
+    setIsProcessing(false);
+
+    if (res.success) {
+      setOrderId(res.order?.id || null);
+      setPurchaseSuccess(true);
+      confetti({
+        particleCount: 140,
+        spread: 90,
+        origin: { y: 0.5 },
+      });
+    } else {
+      setErrorMessage(res.message);
     }
   };
 
@@ -71,6 +65,7 @@ export const VipShop: React.FC = () => {
     setCheckoutItem(null);
     setPurchaseSuccess(false);
     setErrorMessage(null);
+    setOrderId(null);
   };
 
   return (
@@ -187,15 +182,11 @@ export const VipShop: React.FC = () => {
                     </div>
                   </div>
 
-                  <span className="text-xs font-semibold text-neutral-500 tabular-nums">
-                    o {item.priceRobux || 500} Robux
-                  </span>
                 </div>
 
                 <button
                   onClick={() => {
                     setCheckoutItem(item);
-                    setPaymentMode('ClicCoins');
                     setErrorMessage(null);
                   }}
                   className="w-full py-3 px-4 rounded-xl font-bold text-xs sm:text-sm bg-[#67F23B] hover:bg-[#52d726] text-[#121212] transition-colors flex items-center justify-center gap-2 shadow-sm"
@@ -221,7 +212,7 @@ export const VipShop: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="text-base font-extrabold text-neutral-900 dark:text-white">
-                    Pasarela de Entrega Inmediata
+                    Comprar con ClicCoins
                   </h3>
                   <p className="text-xs text-neutral-500">Servidor CLICMaster Roblox</p>
                 </div>
@@ -242,13 +233,13 @@ export const VipShop: React.FC = () => {
                     <Check className="w-8 h-8" />
                   </div>
                   <h4 className="text-xl font-extrabold text-neutral-900 dark:text-white">
-                    ¡Entrega Confirmada con Éxito!
+                    ¡Compra realizada!
                   </h4>
                   <p className="text-sm text-neutral-600 dark:text-neutral-300">
-                    Tu ítem <span className="font-bold">{checkoutItem.title}</span> quedó registrado para la cuenta de Roblox <span className="font-mono font-bold text-[#2B6BFF]">@{user?.roblox_username}</span>. Se descontó de tu saldo de ClicCoins.
+                    Compraste <span className="font-bold">{checkoutItem.title}</span>. El staff lo entregará a tu cuenta de Roblox <span className="font-mono font-bold text-[#2B6BFF]">@{user?.roblox_username}</span>. Puedes ver el estado en tu billetera, en "Mis pedidos".
                   </p>
                   <div className="p-4 rounded-xl bg-neutral-50 dark:bg-neutral-800 text-xs font-mono text-neutral-600 dark:text-neutral-400 border border-neutral-200 dark:border-neutral-700">
-                    ID Transacción: SHOP-{checkoutItem.id.toUpperCase()}-{Date.now()}
+                    Pedido: {orderId}
                   </div>
                   <button
                     onClick={closeCheckout}
@@ -279,40 +270,6 @@ export const VipShop: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Payment Mode Selector */}
-                  <div className="grid grid-cols-2 gap-2 p-1 bg-neutral-100 dark:bg-neutral-800 rounded-xl">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setPaymentMode('ClicCoins');
-                        setErrorMessage(null);
-                      }}
-                      className={`py-2 text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-1.5 ${
-                        paymentMode === 'ClicCoins'
-                          ? 'bg-white dark:bg-neutral-700 text-neutral-900 dark:text-white shadow-xs'
-                          : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'
-                      }`}
-                    >
-                      <Coins className="w-3.5 h-3.5 text-amber-500" />
-                      <span>ClicCoins</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setPaymentMode('Robux');
-                        setErrorMessage(null);
-                      }}
-                      className={`py-2 text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-1.5 ${
-                        paymentMode === 'Robux'
-                          ? 'bg-white dark:bg-neutral-700 text-neutral-900 dark:text-white shadow-xs'
-                          : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'
-                      }`}
-                    >
-                      <span>Robux ({getCoinsCost(checkoutItem)} R$)</span>
-                    </button>
-                  </div>
-
                   {/* Error / Insufficient Balance Warning */}
                   {errorMessage && (
                     <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/30 text-xs text-red-600 dark:text-red-400 space-y-2">
@@ -326,7 +283,7 @@ export const VipShop: React.FC = () => {
                         className="w-full py-2 px-3 rounded-lg bg-amber-500 hover:bg-amber-600 text-[#121212] font-black text-xs flex items-center justify-center gap-1.5 transition-colors"
                       >
                         <Coins className="w-3.5 h-3.5" />
-                        <span>Recargar ClicCoins (Yappy / Robux)</span>
+                        <span>Recargar ClicCoins (Yappy / PayPal)</span>
                       </button>
                     </div>
                   )}
@@ -340,7 +297,7 @@ export const VipShop: React.FC = () => {
 
                   <div className="flex items-center gap-2 text-xs text-neutral-600 dark:text-neutral-400">
                     <ShieldCheck className="w-4 h-4 text-emerald-500" />
-                    <span>Verificación estricta en servidor y entrega inmediata</span>
+                    <span>Pago solo con ClicCoins · Entrega por el staff en Roblox</span>
                   </div>
 
                   <button
@@ -350,10 +307,8 @@ export const VipShop: React.FC = () => {
                   >
                     {isProcessing ? (
                       <span>Validando transacción en servidor...</span>
-                    ) : paymentMode === 'ClicCoins' ? (
-                      <span>Pagar {getCoinsCost(checkoutItem).toLocaleString()} ClicCoins</span>
                     ) : (
-                      <span>Continuar con Robux</span>
+                      <span>Pagar {getCoinsCost(checkoutItem).toLocaleString()} ClicCoins</span>
                     )}
                   </button>
                 </form>

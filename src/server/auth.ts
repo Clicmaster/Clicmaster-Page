@@ -160,3 +160,36 @@ setInterval(() => {
     else attempts.set(key, recent);
   }
 }, 10 * 60 * 1000).unref();
+
+// ============================================================================
+// INVITACIONES DE ADMINISTRADOR (enlace de activación)
+// Un enlace firmado que permite crear UNA cuenta de administrador para un
+// correo concreto. La persona invitada elige su propia contraseña, así nadie
+// más la conoce. Caduca y no se puede reutilizar (el correo queda registrado).
+// ============================================================================
+export interface InvitePayload {
+  email: string;
+  role: 'admin';
+  expires: number;
+}
+
+export function createInviteToken(email: string, hoursValid = 72): string {
+  const payload: InvitePayload = { email: email.trim().toLowerCase(), role: 'admin', expires: Date.now() + hoursValid * 3600_000 };
+  const body = Buffer.from(JSON.stringify(payload)).toString('base64url');
+  return `${body}.${sign(`invite:${body}`)}`;
+}
+
+export function readInviteToken(token: string): InvitePayload | null {
+  if (!SESSION_SECRET || typeof token !== 'string') return null;
+  const [body, signature, extra] = token.split('.');
+  if (!body || !signature || extra !== undefined) return null;
+  if (!safeEqual(sign(`invite:${body}`), signature)) return null;
+  try {
+    const payload = JSON.parse(Buffer.from(body, 'base64url').toString('utf-8')) as InvitePayload;
+    if (payload.role !== 'admin' || typeof payload.email !== 'string') return null;
+    if (!Number.isFinite(payload.expires) || payload.expires < Date.now()) return null;
+    return payload;
+  } catch {
+    return null;
+  }
+}

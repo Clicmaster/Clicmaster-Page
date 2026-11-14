@@ -1,13 +1,17 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { PACKAGES, type CoinPackage } from '../data/coinPackages.ts';
+import type { PaymentSettings } from '../data/paymentSettings.ts';
 
 export type PaymentMethod = 'Yappy' | 'PayPal' | 'Robux' | 'Sistema';
+export type RechargeMethod = 'Yappy' | 'PayPal';
 export type TransactionStatus = 'pendiente' | 'completado' | 'rechazado';
 export type TransactionType = 'compra_coins' | 'gasto_tienda' | 'bonificacion' | 'reembolso';
+export type { CoinPackage, PaymentSettings };
 
 export interface UserProfile {
   id: string;
   username: string;
+  email?: string;
   roblox_username: string;
   cliccoins_balance: number;
   role: 'user' | 'admin';
@@ -27,6 +31,7 @@ export interface ClicTransaction {
   estado: TransactionStatus;
   referencia_pago: string;
   package_id?: string;
+  order_id?: string;
   detalles?: string;
   timestamp: string;
   reviewed_at?: string;
@@ -34,7 +39,48 @@ export interface ClicTransaction {
   rejection_reason?: string;
 }
 
-export type { CoinPackage };
+export type OrderStatus = 'pendiente_entrega' | 'entregado' | 'cancelado';
+
+export interface ShippingInfo {
+  nombre: string;
+  pais: string;
+  direccion: string;
+  telefono: string;
+}
+
+export interface ShopOrder {
+  id: string;
+  user_id: string;
+  username: string;
+  roblox_username: string;
+  email?: string;
+  item_id: string;
+  item_name: string;
+  item_type: 'membresia' | 'virtual' | 'fisico' | 'pack';
+  cost_coins: number;
+  estado: OrderStatus;
+  opciones?: { talla?: string; color?: string };
+  envio?: ShippingInfo;
+  transaction_id: string;
+  timestamp: string;
+  entregado_at?: string;
+  entregado_por?: string;
+  nota_entrega?: string;
+  cancelado_at?: string;
+  cancelado_por?: string;
+  motivo_cancelacion?: string;
+}
+
+/** Datos de pago que ve el cliente (solo métodos activos). */
+export interface PublicPaymentMethods {
+  yappy: { available: boolean; phone?: string; holder?: string; instructions?: string };
+  paypal: { available: boolean; email?: string; link?: string; instructions?: string };
+}
+
+export interface PurchaseExtras {
+  opciones?: { talla?: string; color?: string };
+  envio?: ShippingInfo;
+}
 
 type ActionResult = { success: boolean; message: string };
 
@@ -43,41 +89,61 @@ interface ClicCoinsContextType {
   isLoggedIn: boolean;
   balance: number;
   transactions: ClicTransaction[];
-  /** Solo para administradores: solicitudes pendientes de todos los usuarios. */
-  pendingPayments: ClicTransaction[];
-  /** Solo para administradores: todas las solicitudes de recarga recientes. */
-  adminRequests: ClicTransaction[];
+  orders: ShopOrder[];
   packages: CoinPackage[];
+  paymentMethods: PublicPaymentMethods;
   loading: boolean;
   isAdmin: boolean;
+  // Ventanas
   walletOpen: boolean;
   setWalletOpen: (open: boolean) => void;
   adminPanelOpen: boolean;
   setAdminPanelOpen: (open: boolean) => void;
   authOpen: boolean;
   setAuthOpen: (open: boolean) => void;
-  login: (username: string, password: string) => Promise<ActionResult>;
+  /** Token de invitación de administrador leído del enlace (?invitacion=...) */
+  inviteToken: string | null;
+  clearInvite: () => void;
+  // Cuenta
+  login: (identifier: string, password: string) => Promise<ActionResult>;
   register: (params: {
     username: string;
+    email: string;
     robloxUsername: string;
     password: string;
     adminCode?: string;
   }) => Promise<ActionResult>;
+  checkInvite: (token: string) => Promise<ActionResult & { email?: string }>;
+  activateInvite: (params: {
+    token: string;
+    username: string;
+    robloxUsername: string;
+    password: string;
+  }) => Promise<ActionResult>;
   logout: () => void;
   refreshBalance: () => Promise<void>;
-  fetchPendingPayments: () => Promise<void>;
+  // ClicCoins
   buyCoinsRequest: (params: {
     packageId: string;
-    paymentMethod: 'Yappy' | 'Robux';
+    paymentMethod: RechargeMethod;
     paymentReference: string;
   }) => Promise<ActionResult & { transaction?: ClicTransaction }>;
-  purchaseWithCoins: (itemId: string) => Promise<ActionResult & { newBalance?: number }>;
+  purchaseWithCoins: (itemId: string, extras?: PurchaseExtras) => Promise<ActionResult & { order?: ShopOrder }>;
+  // Administración
+  pendingPayments: ClicTransaction[];
+  adminRequests: ClicTransaction[];
+  adminOrders: ShopOrder[];
+  fetchPendingPayments: () => Promise<void>;
+  fetchAdminOrders: () => Promise<void>;
   approvePayment: (transactionId: string) => Promise<ActionResult>;
   rejectPayment: (transactionId: string, reason?: string) => Promise<ActionResult>;
+  deliverOrder: (orderId: string, note?: string) => Promise<ActionResult>;
+  cancelOrder: (orderId: string, reason: string) => Promise<ActionResult>;
+  getAdminPaymentSettings: () => Promise<PaymentSettings | null>;
+  saveAdminPaymentSettings: (settings: PaymentSettings) => Promise<ActionResult>;
 }
 
-// Los paquetes vienen de la lista oficial compartida con el servidor.
-const DEFAULT_PACKAGES: CoinPackage[] = PACKAGES;
+const NO_METHODS: PublicPaymentMethods = { yappy: { available: false }, paypal: { available: false } };
 
 // En el navegador solo se guarda el "pase" de sesión, nunca el saldo.
 const TOKEN_KEY = 'clicmaster_session';
@@ -95,10 +161,18 @@ function writeToken(token: string | null): void {
   try {
     if (token) localStorage.setItem(TOKEN_KEY, token);
     else localStorage.removeItem(TOKEN_KEY);
-    // Borrar datos falsos que guardaba la versión anterior
     OLD_KEYS.forEach((k) => localStorage.removeItem(k));
   } catch {
     // almacenamiento no disponible
+  }
+}
+
+/** Lee ?invitacion=... del enlace de activación de administrador. */
+function readInviteFromUrl(): string | null {
+  try {
+    return new URLSearchParams(window.location.search).get('invitacion');
+  } catch {
+    return null;
   }
 }
 
@@ -110,13 +184,17 @@ export const ClicCoinsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [token, setToken] = useState<string | null>(readToken);
   const [user, setUser] = useState<UserProfile | null>(null);
   const [transactions, setTransactions] = useState<ClicTransaction[]>([]);
+  const [orders, setOrders] = useState<ShopOrder[]>([]);
   const [pendingPayments, setPendingPayments] = useState<ClicTransaction[]>([]);
   const [adminRequests, setAdminRequests] = useState<ClicTransaction[]>([]);
-  const [packages, setPackages] = useState<CoinPackage[]>(DEFAULT_PACKAGES);
+  const [adminOrders, setAdminOrders] = useState<ShopOrder[]>([]);
+  const [packages, setPackages] = useState<CoinPackage[]>(PACKAGES);
+  const [paymentMethods, setPaymentMethods] = useState<PublicPaymentMethods>(NO_METHODS);
   const [loading, setLoading] = useState<boolean>(false);
   const [walletOpen, setWalletOpenState] = useState<boolean>(false);
   const [adminPanelOpen, setAdminPanelOpen] = useState<boolean>(false);
-  const [authOpen, setAuthOpen] = useState<boolean>(false);
+  const [inviteToken, setInviteToken] = useState<string | null>(readInviteFromUrl);
+  const [authOpen, setAuthOpen] = useState<boolean>(() => !!readInviteFromUrl());
 
   const isAdmin = user?.role === 'admin';
 
@@ -125,9 +203,22 @@ export const ClicCoinsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setToken(null);
     setUser(null);
     setTransactions([]);
+    setOrders([]);
     setPendingPayments([]);
     setAdminRequests([]);
+    setAdminOrders([]);
     setAdminPanelOpen(false);
+  }, []);
+
+  const clearInvite = useCallback(() => {
+    setInviteToken(null);
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('invitacion');
+      window.history.replaceState({}, '', url.toString());
+    } catch {
+      // sin acceso al historial
+    }
   }, []);
 
   /** Llama a la API enviando el pase de sesión. Si la sesión venció, la cierra. */
@@ -142,12 +233,23 @@ export const ClicCoinsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       } catch {
         data = null;
       }
-      if (res.status === 401 && token) {
-        clearSession();
-      }
+      if (res.status === 401 && token) clearSession();
       return { ok: res.ok, status: res.status, data };
     },
     [token, clearSession]
+  );
+
+  /** Ejecuta una acción POST/PUT y devuelve un resultado uniforme. */
+  const action = useCallback(
+    async (url: string, method: 'POST' | 'PUT', body: unknown, fallback: string) => {
+      try {
+        const { ok, data } = await api(url, { method, body: JSON.stringify(body ?? {}) });
+        return { ok: !!(ok && data?.success), data, message: data?.message || (ok ? '' : fallback) };
+      } catch {
+        return { ok: false, data: null, message: NETWORK_ERROR };
+      }
+    },
+    [api]
   );
 
   // Abrir la billetera exige haber iniciado sesión
@@ -162,21 +264,21 @@ export const ClicCoinsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     [token]
   );
 
-  // 1. Saldo e historial del usuario conectado
+  // ------------------------------------------------------------- Lecturas
   const refreshBalance = useCallback(async () => {
     if (!token) return;
     try {
-      const { ok, data } = await api('/api/user/balance');
-      if (ok && data?.success && data.user) {
-        setUser(data.user);
-        setTransactions(Array.isArray(data.transactions) ? data.transactions : []);
+      const [balanceRes, ordersRes] = await Promise.all([api('/api/user/balance'), api('/api/user/orders')]);
+      if (balanceRes.ok && balanceRes.data?.success && balanceRes.data.user) {
+        setUser(balanceRes.data.user);
+        setTransactions(Array.isArray(balanceRes.data.transactions) ? balanceRes.data.transactions : []);
       }
+      if (ordersRes.ok && Array.isArray(ordersRes.data?.orders)) setOrders(ordersRes.data.orders);
     } catch {
-      // Sin conexión: se mantiene lo último que respondió el servidor (no se inventa nada)
+      // Sin conexión: se mantiene lo último que respondió el servidor
     }
   }, [api, token]);
 
-  // 2. Solicitudes de recarga (solo administradores)
   const fetchPendingPayments = useCallback(async () => {
     if (!token || !isAdmin) return;
     try {
@@ -190,7 +292,27 @@ export const ClicCoinsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   }, [api, token, isAdmin]);
 
-  // 3. Paquetes de ClicCoins (públicos)
+  const fetchAdminOrders = useCallback(async () => {
+    if (!token || !isAdmin) return;
+    try {
+      const { ok, data } = await api('/api/admin/orders');
+      if (ok && Array.isArray(data?.orders)) setAdminOrders(data.orders);
+    } catch {
+      // sin conexión
+    }
+  }, [api, token, isAdmin]);
+
+  const fetchPaymentMethods = useCallback(async () => {
+    try {
+      const res = await fetch('/api/payment-settings');
+      const data = res.ok ? await res.json() : null;
+      if (data?.success && data.methods) setPaymentMethods(data.methods);
+    } catch {
+      // se muestran como no disponibles
+    }
+  }, []);
+
+  // Datos públicos: paquetes y métodos de pago
   useEffect(() => {
     fetch('/api/packages')
       .then((res) => (res.ok ? res.json() : null))
@@ -198,9 +320,15 @@ export const ClicCoinsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         if (data?.success && Array.isArray(data.packages)) setPackages(data.packages);
       })
       .catch(() => {
-        // se muestran los paquetes por defecto
+        // se muestran los paquetes oficiales incluidos en la página
       });
-  }, []);
+    fetchPaymentMethods();
+  }, [fetchPaymentMethods]);
+
+  // Al abrir la billetera, actualizar métodos de pago (por si el admin los cambió)
+  useEffect(() => {
+    if (walletOpen) fetchPaymentMethods();
+  }, [walletOpen, fetchPaymentMethods]);
 
   // Actualización periódica mientras haya sesión
   useEffect(() => {
@@ -213,9 +341,13 @@ export const ClicCoinsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   useEffect(() => {
     if (!isAdmin) return;
     fetchPendingPayments();
-    const interval = setInterval(fetchPendingPayments, 15000);
+    fetchAdminOrders();
+    const interval = setInterval(() => {
+      fetchPendingPayments();
+      fetchAdminOrders();
+    }, 15000);
     return () => clearInterval(interval);
-  }, [isAdmin, fetchPendingPayments]);
+  }, [isAdmin, fetchPendingPayments, fetchAdminOrders]);
 
   // ------------------------------------------------------------- Sesión
   const startSession = (newToken: string, newUser: UserProfile) => {
@@ -224,18 +356,15 @@ export const ClicCoinsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setUser(newUser);
   };
 
-  const login = async (username: string, password: string): Promise<ActionResult> => {
+  const sessionAction = async (url: string, body: unknown, fallback: string, welcome: (u: UserProfile) => string) => {
     setLoading(true);
     try {
-      const { ok, data } = await api('/api/auth/login', {
-        method: 'POST',
-        body: JSON.stringify({ username, password }),
-      });
+      const { ok, data } = await api(url, { method: 'POST', body: JSON.stringify(body) });
       if (ok && data?.success && data.token) {
         startSession(data.token, data.user);
-        return { success: true, message: `¡Bienvenido, ${data.user.username}!` };
+        return { success: true, message: welcome(data.user) };
       }
-      return { success: false, message: data?.message || 'No se pudo iniciar sesión.' };
+      return { success: false, message: data?.message || fallback };
     } catch {
       return { success: false, message: NETWORK_ERROR };
     } finally {
@@ -243,27 +372,30 @@ export const ClicCoinsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   };
 
-  const register = async (params: {
-    username: string;
-    robloxUsername: string;
-    password: string;
-    adminCode?: string;
-  }): Promise<ActionResult> => {
-    setLoading(true);
+  const login = (identifier: string, password: string) =>
+    sessionAction('/api/auth/login', { username: identifier, password }, 'No se pudo iniciar sesión.', (u) => `¡Bienvenido, ${u.username}!`);
+
+  const register = (params: { username: string; email: string; robloxUsername: string; password: string; adminCode?: string }) =>
+    sessionAction('/api/auth/register', params, 'No se pudo crear la cuenta.', (u) => `¡Cuenta creada! Bienvenido, ${u.username}.`);
+
+  const activateInvite = async (params: { token: string; username: string; robloxUsername: string; password: string }) => {
+    const res = await sessionAction(
+      '/api/auth/activate-invite',
+      params,
+      'No se pudo activar la cuenta.',
+      (u) => `¡Cuenta de administrador activada! Bienvenido, ${u.username}.`
+    );
+    if (res.success) clearInvite();
+    return res;
+  };
+
+  const checkInvite = async (inviteTok: string) => {
     try {
-      const { ok, data } = await api('/api/auth/register', {
-        method: 'POST',
-        body: JSON.stringify(params),
-      });
-      if (ok && data?.success && data.token) {
-        startSession(data.token, data.user);
-        return { success: true, message: `¡Cuenta creada! Bienvenido, ${data.user.username}.` };
-      }
-      return { success: false, message: data?.message || 'No se pudo crear la cuenta.' };
+      const res = await fetch(`/api/auth/invite?token=${encodeURIComponent(inviteTok)}`);
+      const data = await res.json();
+      return { success: !!data?.success, message: data?.message || '', email: data?.email };
     } catch {
       return { success: false, message: NETWORK_ERROR };
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -272,84 +404,69 @@ export const ClicCoinsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setWalletOpenState(false);
   };
 
-  // ---------------------------------------------------- Recargar ClicCoins
-  const buyCoinsRequest = async (params: {
-    packageId: string;
-    paymentMethod: 'Yappy' | 'Robux';
-    paymentReference: string;
-  }) => {
+  // ------------------------------------------------------------- ClicCoins
+  const buyCoinsRequest = async (params: { packageId: string; paymentMethod: RechargeMethod; paymentReference: string }) => {
     if (!token) {
       setAuthOpen(true);
       return { success: false, message: 'Inicia sesión para recargar ClicCoins.' };
     }
     setLoading(true);
-    try {
-      const { ok, data } = await api('/api/coins/buy-request', {
-        method: 'POST',
-        body: JSON.stringify(params),
-      });
-      if (ok && data?.success) {
-        await refreshBalance();
-        return { success: true, message: data.message, transaction: data.transaction };
-      }
-      return { success: false, message: data?.message || 'No se pudo registrar la solicitud.' };
-    } catch {
-      return { success: false, message: NETWORK_ERROR };
-    } finally {
-      setLoading(false);
-    }
+    const r = await action('/api/coins/buy-request', 'POST', params, 'No se pudo registrar la solicitud.');
+    if (r.ok) await refreshBalance();
+    setLoading(false);
+    return { success: r.ok, message: r.message, transaction: r.data?.transaction };
   };
 
-  // ------------------------------------------------- Comprar en la tienda
-  const purchaseWithCoins = async (itemId: string) => {
+  const purchaseWithCoins = async (itemId: string, extras: PurchaseExtras = {}) => {
     if (!token) {
       setAuthOpen(true);
       return { success: false, message: 'Inicia sesión para comprar con ClicCoins.' };
     }
     setLoading(true);
+    const r = await action('/api/shop/purchase', 'POST', { itemId, ...extras }, 'No se pudo completar la compra.');
+    if (r.ok) await refreshBalance();
+    setLoading(false);
+    return { success: r.ok, message: r.message, order: r.data?.order };
+  };
+
+  // ------------------------------------------------------------- Administración
+  const approvePayment = async (transactionId: string) => {
+    const r = await action(`/api/admin/approve-payment/${encodeURIComponent(transactionId)}`, 'POST', {}, 'No se pudo aprobar el pago.');
+    await Promise.all([fetchPendingPayments(), refreshBalance()]);
+    return { success: r.ok, message: r.message };
+  };
+
+  const rejectPayment = async (transactionId: string, reason?: string) => {
+    const r = await action(`/api/admin/reject-payment/${encodeURIComponent(transactionId)}`, 'POST', { reason: reason || '' }, 'No se pudo rechazar el pago.');
+    await fetchPendingPayments();
+    return { success: r.ok, message: r.message };
+  };
+
+  const deliverOrder = async (orderId: string, note?: string) => {
+    const r = await action(`/api/admin/orders/${encodeURIComponent(orderId)}/deliver`, 'POST', { note: note || '' }, 'No se pudo marcar como entregado.');
+    await fetchAdminOrders();
+    return { success: r.ok, message: r.message };
+  };
+
+  const cancelOrder = async (orderId: string, reason: string) => {
+    const r = await action(`/api/admin/orders/${encodeURIComponent(orderId)}/cancel`, 'POST', { reason }, 'No se pudo cancelar el pedido.');
+    await Promise.all([fetchAdminOrders(), refreshBalance()]);
+    return { success: r.ok, message: r.message };
+  };
+
+  const getAdminPaymentSettings = async (): Promise<PaymentSettings | null> => {
     try {
-      const { ok, data } = await api('/api/shop/purchase', {
-        method: 'POST',
-        body: JSON.stringify({ itemId }),
-      });
-      if (ok && data?.success) {
-        await refreshBalance();
-        return { success: true, message: data.message, newBalance: data.newBalance };
-      }
-      return { success: false, message: data?.message || 'No se pudo completar la compra.' };
+      const { ok, data } = await api('/api/admin/payment-settings');
+      return ok && data?.settings ? data.settings : null;
     } catch {
-      return { success: false, message: NETWORK_ERROR };
-    } finally {
-      setLoading(false);
+      return null;
     }
   };
 
-  // ------------------------------------------------- Acciones de administrador
-  const approvePayment = async (transactionId: string): Promise<ActionResult> => {
-    try {
-      const { ok, data } = await api(`/api/admin/approve-payment/${encodeURIComponent(transactionId)}`, {
-        method: 'POST',
-        body: JSON.stringify({}),
-      });
-      await fetchPendingPayments();
-      await refreshBalance();
-      return { success: !!(ok && data?.success), message: data?.message || 'No se pudo aprobar el pago.' };
-    } catch {
-      return { success: false, message: NETWORK_ERROR };
-    }
-  };
-
-  const rejectPayment = async (transactionId: string, reason?: string): Promise<ActionResult> => {
-    try {
-      const { ok, data } = await api(`/api/admin/reject-payment/${encodeURIComponent(transactionId)}`, {
-        method: 'POST',
-        body: JSON.stringify({ reason: reason || '' }),
-      });
-      await fetchPendingPayments();
-      return { success: !!(ok && data?.success), message: data?.message || 'No se pudo rechazar el pago.' };
-    } catch {
-      return { success: false, message: NETWORK_ERROR };
-    }
+  const saveAdminPaymentSettings = async (settings: PaymentSettings) => {
+    const r = await action('/api/admin/payment-settings', 'PUT', settings, 'No se pudo guardar la configuración.');
+    if (r.ok) await fetchPaymentMethods();
+    return { success: r.ok, message: r.message };
   };
 
   return (
@@ -359,9 +476,9 @@ export const ClicCoinsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         isLoggedIn: !!user,
         balance: user?.cliccoins_balance ?? 0,
         transactions,
-        pendingPayments,
-        adminRequests,
+        orders,
         packages,
+        paymentMethods,
         loading,
         isAdmin,
         walletOpen,
@@ -370,15 +487,27 @@ export const ClicCoinsProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         setAdminPanelOpen,
         authOpen,
         setAuthOpen,
+        inviteToken,
+        clearInvite,
         login,
         register,
+        checkInvite,
+        activateInvite,
         logout,
         refreshBalance,
-        fetchPendingPayments,
         buyCoinsRequest,
         purchaseWithCoins,
+        pendingPayments,
+        adminRequests,
+        adminOrders,
+        fetchPendingPayments,
+        fetchAdminOrders,
         approvePayment,
         rejectPayment,
+        deliverOrder,
+        cancelOrder,
+        getAdminPaymentSettings,
+        saveAdminPaymentSettings,
       }}
     >
       {children}

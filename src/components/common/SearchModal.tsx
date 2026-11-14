@@ -220,7 +220,7 @@ export const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose, onSel
                         className="w-full p-2.5 rounded-xl hover:bg-neutral-100 dark:hover:bg-neutral-800 text-left flex items-center justify-between text-xs transition-colors"
                       >
                         <span className="font-bold text-neutral-900 dark:text-white">{item.title}</span>
-                        <span className="text-emerald-600 font-bold">{item.priceCLIC > 0 ? `$${item.priceCLIC.toLocaleString()} CLIC` : `${item.priceRobux} Robux`}</span>
+                        <span className="text-emerald-600 font-bold">🪙 {item.priceCoins.toLocaleString()} ClicCoins</span>
                       </button>
                     ))}
                   </div>

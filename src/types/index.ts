@@ -47,8 +47,10 @@ export interface ShopItem {
   title: string;
   category: 'VIP' | 'Vehículos' | 'Casas' | 'Skins' | 'Negocios' | 'Gamepass' | 'Monedas';
   description: string;
+  /** Precio de referencia en dinero del juego (CLIC dentro de Roblox) */
   priceCLIC: number;
-  priceRobux?: number;
+  /** Precio en ClicCoins en la página web */
+  priceCoins: number;
   rarity: 'Común' | 'Raro' | 'Épico' | 'Legendario' | 'Exclusivo';
   image: string;
   benefits: string[];

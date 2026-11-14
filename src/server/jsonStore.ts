@@ -5,22 +5,28 @@
 // ============================================================================
 import fs from 'node:fs';
 import path from 'node:path';
+import { DEFAULT_PAYMENT_SETTINGS } from '../data/paymentSettings.js';
 import {
   BuyRequestParams,
   DataStore,
   DEFAULT_AVATAR,
   MAX_PENDING_PER_USER,
+  NewUserParams,
+  Order,
+  PaymentSettings,
   PublicUser,
-  ShopPurchase,
   ShopPurchaseParams,
   StoredUser,
   Transaction,
   UserFacingError,
+  assertOrderPending,
   buildBuyRequestTransaction,
+  buildRefundTransaction,
   buildShopRecords,
   getPackage,
   insufficientBalance,
   newId,
+  normalizeEmail,
   normalizeReference,
   sortNewestFirst,
   toPublicUser,
@@ -29,17 +35,24 @@ import {
 interface DatabaseSchema {
   users: Record<string, StoredUser>;
   transactions: Transaction[];
-  shop_purchases: ShopPurchase[];
+  orders: Order[];
+  payment_settings: PaymentSettings;
 }
 
-const emptyData = (): DatabaseSchema => ({ users: {}, transactions: [], shop_purchases: [] });
+const emptyData = (): DatabaseSchema => ({
+  users: {},
+  transactions: [],
+  orders: [],
+  payment_settings: structuredClone(DEFAULT_PAYMENT_SETTINGS),
+});
 
 function parse(raw: string): DatabaseSchema {
   const parsed = JSON.parse(raw);
   return {
     users: parsed.users || {},
     transactions: Array.isArray(parsed.transactions) ? parsed.transactions : [],
-    shop_purchases: Array.isArray(parsed.shop_purchases) ? parsed.shop_purchases : [],
+    orders: Array.isArray(parsed.orders) ? parsed.orders : [],
+    payment_settings: parsed.payment_settings || structuredClone(DEFAULT_PAYMENT_SETTINGS),
   };
 }
 
@@ -99,6 +112,7 @@ export class JsonFileStore implements DataStore {
     // siempre disponible
   }
 
+  // ---------------------------------------------------------------- Usuarios
   async getPublicUser(userId: string): Promise<PublicUser | undefined> {
     const user = this.data.users[userId];
     if (!user || !user.password_hash) return undefined;
@@ -110,20 +124,23 @@ export class JsonFileStore implements DataStore {
     return Object.values(this.data.users).find((u) => u.username.toLowerCase() === wanted);
   }
 
-  async createUser(params: {
-    username: string;
-    robloxUsername: string;
-    passwordHash: string;
-    passwordSalt: string;
-    role: 'user' | 'admin';
-  }): Promise<PublicUser> {
+  async findUserByEmail(email: string): Promise<StoredUser | undefined> {
+    const wanted = normalizeEmail(email);
+    return Object.values(this.data.users).find((u) => u.email && normalizeEmail(u.email) === wanted);
+  }
+
+  async createUser(params: NewUserParams): Promise<PublicUser> {
     if (await this.findUserByUsername(params.username)) {
       throw new UserFacingError('Ese nombre de usuario ya está en uso.');
+    }
+    if (await this.findUserByEmail(params.email)) {
+      throw new UserFacingError('Ya existe una cuenta con ese correo.');
     }
     const user: StoredUser = {
       id: newId('usr'),
       username: params.username,
       username_lower: params.username.toLowerCase(),
+      email: normalizeEmail(params.email),
       roblox_username: params.robloxUsername,
       cliccoins_balance: 0,
       role: params.role,
@@ -137,6 +154,7 @@ export class JsonFileStore implements DataStore {
     return toPublicUser(user);
   }
 
+  // ---------------------------------------------------------------- Recargas
   async getUserTransactions(userId: string): Promise<Transaction[]> {
     return sortNewestFirst(this.data.transactions.filter((t) => t.user_id === userId)).slice(0, 200);
   }
@@ -168,6 +186,7 @@ export class JsonFileStore implements DataStore {
     const normalizedRef = normalizeReference(params.paymentReference);
     const duplicate = this.data.transactions.find(
       (t) =>
+        t.tipo === 'compra_coins' &&
         t.metodo_pago === params.paymentMethod &&
         t.estado !== 'rechazado' &&
         normalizeReference(t.referencia_pago) === normalizedRef
@@ -213,21 +232,68 @@ export class JsonFileStore implements DataStore {
     return tx;
   }
 
+  // ------------------------------------------------------- Tienda y pedidos
   async processShopPurchase(
     params: ShopPurchaseParams
-  ): Promise<{ newBalance: number; transaction: Transaction; purchase: ShopPurchase }> {
+  ): Promise<{ newBalance: number; transaction: Transaction; order: Order }> {
     const user = this.data.users[params.userId];
     if (!user) throw new UserFacingError('Usuario no encontrado.', 404);
-    if (!Number.isInteger(params.costCoins) || params.costCoins <= 0) {
-      throw new UserFacingError('El precio del artículo no es válido.');
-    }
-    if (user.cliccoins_balance < params.costCoins) throw insufficientBalance(user.cliccoins_balance, params.costCoins);
+    const cost = params.item.costCoins;
+    if (!Number.isInteger(cost) || cost <= 0) throw new UserFacingError('El precio del artículo no es válido.');
+    if (user.cliccoins_balance < cost) throw insufficientBalance(user.cliccoins_balance, cost);
 
-    user.cliccoins_balance -= params.costCoins;
-    const { transaction, purchase } = buildShopRecords(user, params);
+    user.cliccoins_balance -= cost;
+    const { transaction, order } = buildShopRecords(user, params);
     this.data.transactions.unshift(transaction);
-    this.data.shop_purchases.unshift(purchase);
+    this.data.orders.unshift(order);
     this.save();
-    return { newBalance: user.cliccoins_balance, transaction, purchase };
+    return { newBalance: user.cliccoins_balance, transaction, order };
+  }
+
+  async getUserOrders(userId: string): Promise<Order[]> {
+    return sortNewestFirst(this.data.orders.filter((o) => o.user_id === userId)).slice(0, 200);
+  }
+
+  async getOrders(limit = 300): Promise<Order[]> {
+    return sortNewestFirst(this.data.orders).slice(0, limit);
+  }
+
+  async markOrderDelivered(orderId: string, adminUsername: string, note: string): Promise<Order> {
+    const order = this.data.orders.find((o) => o.id === orderId);
+    assertOrderPending(order, orderId);
+    order.estado = 'entregado';
+    order.entregado_at = new Date().toISOString();
+    order.entregado_por = adminUsername;
+    if (note) order.nota_entrega = note;
+    this.save();
+    return order;
+  }
+
+  async cancelOrder(orderId: string, adminUsername: string, reason: string): Promise<{ order: Order; refund: Transaction }> {
+    const order = this.data.orders.find((o) => o.id === orderId);
+    assertOrderPending(order, orderId);
+    const user = this.data.users[order.user_id];
+    if (!user) throw new UserFacingError('El usuario de este pedido ya no existe.');
+
+    const refund = buildRefundTransaction(order, adminUsername, reason);
+    user.cliccoins_balance += order.cost_coins;
+    order.estado = 'cancelado';
+    order.cancelado_at = refund.timestamp;
+    order.cancelado_por = adminUsername;
+    order.motivo_cancelacion = reason;
+    this.data.transactions.unshift(refund);
+    this.save();
+    return { order, refund };
+  }
+
+  // ---------------------------------------------------------- Ajustes de pago
+  async getPaymentSettings(): Promise<PaymentSettings> {
+    return structuredClone(this.data.payment_settings);
+  }
+
+  async savePaymentSettings(settings: PaymentSettings, adminUsername: string): Promise<PaymentSettings> {
+    this.data.payment_settings = { ...settings, updated_at: new Date().toISOString(), updated_by: adminUsername };
+    this.save();
+    return structuredClone(this.data.payment_settings);
   }
 }

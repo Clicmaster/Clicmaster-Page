@@ -455,7 +455,7 @@ export const SHOP_ITEMS: ShopItem[] = [
     category: 'VIP',
     description: 'El rango supremo para ciudadanos distinguidos con privilegios exclusivos en todo el servidor.',
     priceCLIC: 450000,
-    priceRobux: 799,
+    priceCoins: 799,
     rarity: 'Legendario',
     popular: true,
     benefits: [
@@ -474,7 +474,7 @@ export const SHOP_ITEMS: ShopItem[] = [
     category: 'VIP',
     description: 'Estatus distinguido con multiplicador de ganancias y comodidades urbanas.',
     priceCLIC: 250000,
-    priceRobux: 499,
+    priceCoins: 499,
     rarity: 'Épico',
     benefits: [
       'Salario multiplicado x2.0 en todos los trabajos',
@@ -490,7 +490,7 @@ export const SHOP_ITEMS: ShopItem[] = [
     category: 'Vehículos',
     description: 'Velocidad punta de 345 km/h, tracción integral y aceleración de 0 a 100 en 2.5 segundos.',
     priceCLIC: 890000,
-    priceRobux: 950,
+    priceCoins: 950,
     rarity: 'Exclusivo',
     popular: true,
     benefits: [
@@ -507,7 +507,7 @@ export const SHOP_ITEMS: ShopItem[] = [
     category: 'Vehículos',
     description: 'Todoterreno blindado capaz de escalar montañas y resistir cualquier impacto urbano.',
     priceCLIC: 380000,
-    priceRobux: 350,
+    priceCoins: 350,
     rarity: 'Raro',
     benefits: [
       'Capacidad para 6 ocupantes',
@@ -522,7 +522,7 @@ export const SHOP_ITEMS: ShopItem[] = [
     category: 'Casas',
     description: 'Propiedad de lujo en las colinas de Brookhaven con vista de 360 grados a los rascacielos.',
     priceCLIC: 1200000,
-    priceRobux: 1200,
+    priceCoins: 1200,
     rarity: 'Exclusivo',
     benefits: [
       'Piscina infinity climatizada con cascada de agua',
@@ -538,7 +538,7 @@ export const SHOP_ITEMS: ShopItem[] = [
     category: 'Monedas',
     description: 'Fondos limpios acreditados instantáneamente a tu cuenta bancaria de Metro Bank.',
     priceCLIC: 0,
-    priceRobux: 400,
+    priceCoins: 400,
     rarity: 'Épico',
     benefits: [
       'Acreditación inmediata con tu usuario de Roblox',

@@ -12,8 +12,14 @@ import {
   Filter,
   AlertCircle,
   ExternalLink,
+  Package,
+  Settings,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { AdminOrdersPanel } from './AdminOrdersPanel.tsx';
+import { AdminPaymentSettingsPanel } from './AdminPaymentSettingsPanel.tsx';
+
+type Section = 'recargas' | 'pedidos' | 'ajustes';
 
 export const AdminPaymentsModal: React.FC = () => {
   const {
@@ -21,9 +27,13 @@ export const AdminPaymentsModal: React.FC = () => {
     setAdminPanelOpen,
     pendingPayments,
     adminRequests: transactions,
+    adminOrders,
     approvePayment,
     rejectPayment,
   } = useClicCoins();
+
+  const [section, setSection] = useState<Section>('recargas');
+  const pendingOrders = adminOrders.filter((o) => o.estado === 'pendiente_entrega').length;
 
   const [filterState, setFilterState] = useState<'pendientes' | 'completados' | 'rechazados' | 'todos'>('pendientes');
   const [searchTerm, setSearchTerm] = useState('');
@@ -109,13 +119,13 @@ export const AdminPaymentsModal: React.FC = () => {
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-lg sm:text-xl font-black">Panel de Aprobación de Pagos</h3>
+                <h3 className="text-lg sm:text-xl font-black">Panel de Administración</h3>
                 <span className="px-2 py-0.5 text-[10px] font-black uppercase tracking-wider rounded-md bg-[#67F23B]/20 text-[#67F23B] border border-[#67F23B]/30">
                   Admin Master
                 </span>
               </div>
               <p className="text-xs text-neutral-400">
-                Gestión y validación de recargas manuales (Yappy y Robux)
+                Recargas (Yappy y PayPal), pedidos de la tienda y configuración de pagos
               </p>
             </div>
           </div>
@@ -128,6 +138,38 @@ export const AdminPaymentsModal: React.FC = () => {
           </button>
         </div>
 
+        {/* Secciones del panel */}
+        <div className="px-6 pt-3 flex gap-2 shrink-0 border-b border-neutral-200 dark:border-neutral-800 overflow-x-auto">
+          {(
+            [
+              ['recargas', 'Recargas', pendingPayments.length],
+              ['pedidos', 'Pedidos', pendingOrders],
+              ['ajustes', 'Configuración de pagos', 0],
+            ] as const
+          ).map(([key, text, count]) => (
+            <button
+              key={key}
+              onClick={() => setSection(key)}
+              className={`pb-3 px-2 text-xs sm:text-sm font-extrabold border-b-2 flex items-center gap-1.5 whitespace-nowrap transition-colors ${
+                section === key
+                  ? 'border-[#67F23B] text-[#1a700d] dark:text-[#67F23B]'
+                  : 'border-transparent text-neutral-500 hover:text-neutral-900 dark:hover:text-white'
+              }`}
+            >
+              {key === 'recargas' ? <Coins className="w-4 h-4" /> : key === 'pedidos' ? <Package className="w-4 h-4" /> : <Settings className="w-4 h-4" />}
+              <span>{text}</span>
+              {count > 0 && (
+                <span className="px-1.5 py-0.5 text-[9px] font-black rounded-full bg-amber-500 text-[#121212] leading-none">{count}</span>
+              )}
+            </button>
+          ))}
+        </div>
+
+        {section === 'pedidos' && <AdminOrdersPanel />}
+        {section === 'ajustes' && <AdminPaymentSettingsPanel />}
+
+        {section === 'recargas' && (
+        <>
         {/* Feedback Alert */}
         {feedback && (
           <div
@@ -227,7 +269,7 @@ export const AdminPaymentsModal: React.FC = () => {
               <ShieldCheck className="w-10 h-10 mx-auto opacity-30 text-[#67F23B]" />
               <p className="text-sm font-bold">No hay transacciones en esta categoría.</p>
               <p className="text-xs text-neutral-500">
-                Las nuevas solicitudes de Yappy o Robux aparecerán aquí automáticamente.
+                Las nuevas solicitudes de Yappy o PayPal aparecerán aquí automáticamente.
               </p>
             </div>
           ) : (
@@ -315,9 +357,7 @@ export const AdminPaymentsModal: React.FC = () => {
                         +{tx.cantidad_coins.toLocaleString()} 🪙
                       </div>
                       <div className="text-xs font-bold text-neutral-500">
-                        {tx.moneda === 'ROBUX' || tx.metodo_pago === 'Robux'
-                          ? `${tx.monto_dinero_real} Robux`
-                          : `$${tx.monto_dinero_real} USD`}
+                        {tx.moneda === 'ROBUX' ? `${tx.monto_dinero_real} Robux` : `$${tx.monto_dinero_real} USD`}
                       </div>
                     </div>
 
@@ -403,6 +443,8 @@ export const AdminPaymentsModal: React.FC = () => {
               </form>
             </div>
           </div>
+        )}
+        </>
         )}
       </div>
     </div>

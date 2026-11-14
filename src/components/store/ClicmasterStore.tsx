@@ -18,182 +18,17 @@ import {
   Flame,
 } from 'lucide-react';
 import { StoreCheckoutModal, CheckoutModalItem } from './StoreCheckoutModal.tsx';
-import { VIRTUAL_PRODUCTS, VirtualProduct } from '../../data/storeProducts.ts';
-
-// High quality WebP optimized images for Merch
-const MERCH_HOODIE = '/src/assets/images/clicmaster_merch_hoodie_1794100557771.webp';
-const MERCH_CAP = '/src/assets/images/clicmaster_merch_cap_1794100558380.webp';
-const MERCH_MOUSEPAD = '/src/assets/images/clicmaster_merch_mousepad_1794100559849.webp';
-const MERCH_LIFESTYLE = '/src/assets/images/clicmaster_merch_lifestyle_1794100560331.webp';
-
-interface PhysicalProduct {
-  id: string;
-  name: string;
-  icon: string;
-  price: string;
-  badge: 'Nuevo' | 'Más vendido' | 'Edición limitada';
-  image: string;
-  sizes: string[];
-  colors: string[];
-  stock: number;
-  desc: string;
-}
-
-interface ExclusivePack {
-  id: string;
-  name: string;
-  tagline: string;
-  price: string;
-  badge: string;
-  items: string[];
-  popular?: boolean;
-}
-
-
-const PHYSICAL_PRODUCTS: PhysicalProduct[] = [
-  {
-    id: 'p-hoodie',
-    name: 'Hoodie Oficial CLICMASTER',
-    icon: '🧥',
-    price: '$44.99 USD',
-    badge: 'Más vendido',
-    image: MERCH_HOODIE,
-    sizes: ['S', 'M', 'L', 'XL', '2XL'],
-    colors: ['Negro Cyber', 'Gris Grafito'],
-    stock: 28,
-    desc: 'Algodón pesado 380 GSM con bordado neón #7CFF3A de alta densidad.',
-  },
-  {
-    id: 'p-gorra',
-    name: 'Gorra Trucker Oficial CLICMASTER',
-    icon: '🧢',
-    price: '$24.99 USD',
-    badge: 'Nuevo',
-    image: MERCH_CAP,
-    sizes: ['Ajustable (Snapback)'],
-    colors: ['Negro Intenso'],
-    stock: 45,
-    desc: 'Visera curva con relieve 3D electro-verde e interior transpirable.',
-  },
-  {
-    id: 'p-franela',
-    name: 'Franela Urbana CLICMASTER Latam',
-    icon: '👕',
-    price: '$21.99 USD',
-    badge: 'Nuevo',
-    image: MERCH_HOODIE,
-    sizes: ['XS', 'S', 'M', 'L', 'XL'],
-    colors: ['Negro Jet', 'Blanco Ártico'],
-    stock: 60,
-    desc: 'Corte oversize premium 100% algodón peinado con serigrafía táctil.',
-  },
-  {
-    id: 'p-mousepad',
-    name: 'Mousepad Gamer XL Cyber Metropolis',
-    icon: '💻',
-    price: '$29.99 USD',
-    badge: 'Edición limitada',
-    image: MERCH_MOUSEPAD,
-    sizes: ['900 x 400 x 4 mm'],
-    colors: ['RGB Neón Edge'],
-    stock: 18,
-    desc: 'Borde con costura reforzada, base antideslizante y textura Speed/Control.',
-  },
-  {
-    id: 'p-mouse',
-    name: 'Mouse Gamer Ultraligero Pro 8K',
-    icon: '🖱',
-    price: '$49.99 USD',
-    badge: 'Edición limitada',
-    image: MERCH_MOUSEPAD,
-    sizes: ['Ergonómico (62g)'],
-    colors: ['Matte Black + Green Glow'],
-    stock: 14,
-    desc: 'Sensor óptico 26,000 DPI con switches ópticos de 100 millones de clics.',
-  },
-  {
-    id: 'p-teclado',
-    name: 'Teclado Mecánico RGB 75% CLIC Custom',
-    icon: '⌨',
-    price: '$89.99 USD',
-    badge: 'Edición limitada',
-    image: MERCH_MOUSEPAD,
-    sizes: ['Formato 75% Compacto'],
-    colors: ['Linear Green Switches'],
-    stock: 9,
-    desc: 'Gasket mount, perilla de aluminio multimedia y switches lubricados de fábrica.',
-  },
-  {
-    id: 'p-morral',
-    name: 'Morral Ergonómico Antirrobo CLIC',
-    icon: '🎒',
-    price: '$39.99 USD',
-    badge: 'Más vendido',
-    image: MERCH_HOODIE,
-    sizes: ['Capacidad 25L'],
-    colors: ['Negro Táctico'],
-    stock: 22,
-    desc: 'Compartimento acolchado para laptop de 16", puerto USB y tejido impermeable.',
-  },
-  {
-    id: 'p-taza',
-    name: 'Taza Cerámica Termocrómica Cyber Mug',
-    icon: '☕',
-    price: '$16.99 USD',
-    badge: 'Nuevo',
-    image: MERCH_CAP,
-    sizes: ['15 oz (450 ml)'],
-    colors: ['Negro con cambio térmico a Verde'],
-    stock: 50,
-    desc: 'Al verter líquidos calientes revela la skyline iluminada de Brookhaven.',
-  },
-];
-
-const EXCLUSIVE_PACKS: ExclusivePack[] = [
-  {
-    id: 'pack-starter',
-    name: 'Starter Pack',
-    tagline: 'El kit perfecto para entrar al servidor con estilo propio.',
-    price: '$39.99 USD',
-    badge: 'Ideal Nuevos',
-    items: [
-      'Franela Urbana Oficial',
-      'Gorra Snapback CLICMASTER',
-      'Código Virtual 50,000 CLIC Coins',
-      'Pase VIP Bronce (7 días)',
-    ],
-  },
-  {
-    id: 'pack-community',
-    name: 'Community Pack',
-    tagline: 'Para los ciudadanos más leales que viven la comunidad cada día.',
-    price: '$79.99 USD',
-    badge: 'Más Popular',
-    popular: true,
-    items: [
-      'Hoodie Oficial Bordado',
-      'Mousepad Gamer XL Cyber',
-      'Taza Cerámica Termocrómica',
-      'Rol Exclusivo Discord "Community Supporter"',
-      'Insignia Especial en el Perfil Web',
-    ],
-  },
-  {
-    id: 'pack-legend',
-    name: 'Legend Pack',
-    tagline: 'La cúspide para los líderes de facción y leyendas del rol.',
-    price: '$149.99 USD',
-    badge: 'Edición Suprema',
-    items: [
-      'Todo lo incluido en Starter & Community Pack',
-      'Teclado Mecánico RGB 75% Custom',
-      'Certificado Digital de Fundador',
-      'Firma Autografiada Digital del Creador',
-      'Pase VIP Diamante Permanente en Roblox',
-      'Canal de voz privado con el staff en Discord',
-    ],
-  },
-];
+import {
+  VIRTUAL_PRODUCTS,
+  VirtualProduct,
+  PHYSICAL_PRODUCTS,
+  PhysicalProduct,
+  EXCLUSIVE_PACKS,
+  ExclusivePack,
+  MERCH_HOODIE,
+  MERCH_MOUSEPAD,
+  MERCH_LIFESTYLE,
+} from '../../data/storeProducts.ts';
 
 const COMMUNITY_METRICS = [
   { number: '15,000+', label: 'Miembros Discord', icon: Users, sub: 'Comunidad en línea activa' },
@@ -274,7 +109,7 @@ export const ClicmasterStore: React.FC = () => {
     setCheckoutItem({
       id: product.id,
       name: product.name,
-      price: `${product.priceRobux} Robux`,
+      priceCoins: product.priceCoins,
       category: 'Virtual',
       type: 'virtual',
       image: product.image,
@@ -286,7 +121,7 @@ export const ClicmasterStore: React.FC = () => {
     setCheckoutItem({
       id: product.id,
       name: product.name,
-      price: product.price,
+      priceCoins: product.priceCoins,
       category: 'Físico',
       type: 'physical',
       image: product.image,
@@ -300,7 +135,7 @@ export const ClicmasterStore: React.FC = () => {
     setCheckoutItem({
       id: pack.id,
       name: pack.name,
-      price: pack.price,
+      priceCoins: pack.priceCoins,
       category: 'Pack',
       type: 'pack',
       image: MERCH_HOODIE,
@@ -452,10 +287,10 @@ export const ClicmasterStore: React.FC = () => {
                   <div className="pt-3 border-t border-neutral-100 dark:border-neutral-800 flex items-center justify-between">
                     <div>
                       <span className="text-[10px] uppercase font-bold text-neutral-400 block">
-                        Precio Robux
+                        Precio
                       </span>
                       <span className="text-base font-black text-neutral-900 dark:text-white tabular-nums">
-                        {prod.priceRobux} R$
+                        🪙 {prod.priceCoins.toLocaleString()}
                       </span>
                     </div>
 
@@ -523,7 +358,7 @@ export const ClicmasterStore: React.FC = () => {
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-xl">{prod.icon}</span>
                         <span className="text-lg font-black text-[#1a6b0c] dark:text-[#7CFF3A] tabular-nums">
-                          {prod.price}
+                          🪙 {prod.priceCoins.toLocaleString()}
                         </span>
                       </div>
 
@@ -591,7 +426,7 @@ export const ClicmasterStore: React.FC = () => {
                       className="w-full mt-2 py-3 px-4 rounded-xl font-black text-xs bg-[#7CFF3A] hover:bg-[#68e02b] text-[#121212] transition-all flex items-center justify-center gap-2 shadow-xs active:scale-95"
                     >
                       <ShoppingBag className="w-3.5 h-3.5" />
-                      <span>Comprar {prod.price}</span>
+                      <span>Comprar · {prod.priceCoins.toLocaleString()} ClicCoins</span>
                     </button>
                   </div>
                 );
@@ -641,7 +476,7 @@ export const ClicmasterStore: React.FC = () => {
                       {pack.badge}
                     </span>
                     <span className="text-2xl font-black text-[#7CFF3A] tabular-nums">
-                      {pack.price}
+                      🪙 {pack.priceCoins.toLocaleString()}
                     </span>
                   </div>
 

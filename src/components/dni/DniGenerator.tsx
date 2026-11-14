@@ -23,22 +23,22 @@ const ROBLOX_AVATAR_PRESETS = [
   {
     id: 'officer',
     label: 'Oficial RPD',
-    img: '/src/assets/images/roblox_police_tactical_1794365859519.jpg',
+    img: '/assets/images/roblox_police_tactical_1794365859519.jpg',
   },
   {
     id: 'doctor',
     label: 'Médico SAMUR',
-    img: '/src/assets/images/roblox_doctor_scrubs_1794365860261.jpg',
+    img: '/assets/images/roblox_doctor_scrubs_1794365860261.jpg',
   },
   {
     id: 'vip',
     label: 'Ejecutivo VIP',
-    img: '/src/assets/images/roblox_vip_pass_1794365858806.jpg',
+    img: '/assets/images/roblox_vip_pass_1794365858806.jpg',
   },
   {
     id: 'fire',
     label: 'Bombero #12',
-    img: '/src/assets/images/roblox_firefighter_gear_1794365861409.jpg',
+    img: '/assets/images/roblox_firefighter_gear_1794365861409.jpg',
   },
 ];
 

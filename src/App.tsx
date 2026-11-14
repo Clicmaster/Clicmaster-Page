@@ -26,6 +26,7 @@ import { LiveDirectModal } from './components/common/LiveDirectModal.tsx';
 import { ClicCoinsProvider } from './context/ClicCoinsContext.tsx';
 import { ClicCoinsWalletModal } from './components/coins/ClicCoinsWalletModal.tsx';
 import { AdminPaymentsModal } from './components/coins/AdminPaymentsModal.tsx';
+import { AuthModal } from './components/coins/AuthModal.tsx';
 
 export default function App() {
   const [darkMode, setDarkMode] = useState<boolean>(() => {
@@ -137,6 +138,7 @@ export default function App() {
       {/* ClicCoins Virtual Economy Modals */}
       <ClicCoinsWalletModal />
       <AdminPaymentsModal />
+      <AuthModal />
     </div>
   </ClicCoinsProvider>
   );

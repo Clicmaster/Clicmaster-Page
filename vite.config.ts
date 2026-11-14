@@ -38,6 +38,10 @@ export default defineConfig(() => {
       },
     },
     server: {
+      // Nunca servir la base de datos ni archivos secretos en modo desarrollo
+      fs: {
+        deny: ['.env', '.env.*', '*.{crt,pem}', '**/cliccoins_db*'],
+      },
       hmr: process.env.DISABLE_HMR !== 'true',
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
     },

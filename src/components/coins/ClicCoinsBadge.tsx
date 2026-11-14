@@ -1,9 +1,24 @@
 import React from 'react';
 import { useClicCoins } from '../../context/ClicCoinsContext.tsx';
-import { Coins, Plus, ShieldCheck } from 'lucide-react';
+import { Coins, Plus, ShieldCheck, LogIn } from 'lucide-react';
 
 export const ClicCoinsBadge: React.FC = () => {
-  const { balance, pendingPayments, isAdmin, setWalletOpen, setAdminPanelOpen } = useClicCoins();
+  const { balance, pendingPayments, isAdmin, isLoggedIn, setWalletOpen, setAdminPanelOpen, setAuthOpen } =
+    useClicCoins();
+
+  // Sin sesión: mostrar botón para entrar
+  if (!isLoggedIn) {
+    return (
+      <button
+        onClick={() => setAuthOpen(true)}
+        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-[#67F23B] hover:bg-[#52db28] text-[#121212] text-xs font-black transition-colors shadow-xs shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#67F23B]"
+        title="Inicia sesión para usar ClicCoins"
+      >
+        <LogIn className="w-3.5 h-3.5" />
+        <span>Entrar</span>
+      </button>
+    );
+  }
 
   return (
     <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">

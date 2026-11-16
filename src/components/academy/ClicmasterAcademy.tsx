@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   GraduationCap,
+  ArrowUpRight,
   Sparkles,
   ChevronDown,
   ArrowRight,
@@ -374,6 +375,20 @@ export const ClicmasterAcademy: React.FC = () => {
                   <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/10 text-xs font-bold text-neutral-200 border border-white/15">
                     <Star className="w-4 h-4 text-amber-400 fill-current" />
                     <span>Certificación Oficial CLICMaster Developer</span>
+                  </div>
+
+                  <div className="mt-6">
+                    <a
+                      href="https://academy.clicmaster.net"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center justify-center gap-2.5 px-7 py-3.5 rounded-2xl font-black text-sm sm:text-base text-[#121212] bg-[#67F23B] hover:bg-[#52d726] active:scale-98 transition-all duration-200 shadow-lg hover:shadow-[0_4px_30px_rgba(103,242,59,0.45)]"
+                    >
+                      <GraduationCap className="w-5 h-5" />
+                      <span>Entrar a CLICMaster Academy</span>
+                      <ArrowUpRight className="w-4 h-4" />
+                    </a>
+                    <p className="text-[11px] text-neutral-400 mt-2">academy.clicmaster.net</p>
                   </div>
                 </div>
               </div>

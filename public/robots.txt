@@ -1,4 +1,5 @@
 User-agent: *
 Allow: /
+Disallow: /api/
 
-Sitemap: https://clicmaster.roblox.lat/sitemap.xml
+Sitemap: https://clicmaster.net/sitemap.xml

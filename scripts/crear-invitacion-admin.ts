@@ -9,7 +9,7 @@
 import { createInviteToken } from '../src/server/auth.js';
 
 const email = process.argv[2];
-const site = process.env.SITE_URL || 'https://clicmaster.vercel.app';
+const site = process.env.SITE_URL || 'https://clicmaster.net';
 if (!email || !email.includes('@')) {
   console.error('Escribe el correo: npx tsx scripts/crear-invitacion-admin.ts correo@ejemplo.com');
   process.exit(1);

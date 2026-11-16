@@ -240,7 +240,7 @@ export const Footer: React.FC<FooterProps> = ({ onOpenRules, onOpenDni, onOpenCo
               </button>
             </div>
             <div className="text-xs font-mono text-neutral-600 dark:text-neutral-300 space-y-2 max-h-[60vh] overflow-y-auto bg-neutral-50 dark:bg-neutral-850 p-4 rounded-xl border border-neutral-200 dark:border-neutral-700">
-              <div>https://clicmaster.roblox.lat/ (Prioridad 1.0)</div>
+              <div>https://clicmaster.net/ (Prioridad 1.0)</div>
               <div>├── #eventos (Calendario Oficial)</div>
               <div>├── #academy (Clicmaster Academy 10 Niveles)</div>
               <div>├── #noticias (Actualizaciones v5.2)</div>

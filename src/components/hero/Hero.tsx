@@ -109,13 +109,13 @@ export const Hero: React.FC<HeroProps> = ({ onOpenDirect, onOpenRules }) => {
               {/* Main Image with fallback */}
               <img
                 src={HERO_IMAGE}
-                alt="Vista cinematográfica de la metrópolis de CLICMaster inspirada en Brookhaven"
+                alt="Evento en vivo de la comunidad CLICMaster en Roblox"
                 referrerPolicy="no-referrer"
                 className="w-full h-[360px] sm:h-[440px] md:h-[480px] object-cover transition-transform duration-700 group-hover:scale-105"
                 loading="eager"
                 fetchPriority="high"
-                width={1376}
-                height={768}
+                width={1400}
+                height={868}
                 decoding="async"
               />
 

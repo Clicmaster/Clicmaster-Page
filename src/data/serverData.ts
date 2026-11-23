@@ -8,7 +8,19 @@ import {
   ShopItem,
 } from '../types/index.ts';
 
-export const HERO_IMAGE = '/assets/images/clicmaster_hero_city_1793308351652.webp';
+// Fotos reales de la comunidad (capturas del servidor)
+export const HERO_IMAGE = '/assets/comunidad/evento_escenario_luces.webp';
+export const SHOW_NOCHE_IMAGE = '/assets/comunidad/show_escenario_noche.webp';
+export const PURGA_NOCTURNA_IMAGE = '/assets/comunidad/staff_policia_patrulla.webp';
+export const STAFF_POLICIA_IMAGE = '/assets/comunidad/staff_policia_patrulla.webp';
+export const AMBULANCIA_IMAGE = '/assets/comunidad/ambulancia_samur.webp';
+export const GOBIERNO_IMAGE = '/assets/comunidad/reunion_gabinete_gobierno.webp';
+export const PRENSA_GOBIERNO_IMAGE = '/assets/comunidad/prensa_palacio_gobierno.webp';
+export const ENTRENAMIENTO_IMAGE = '/assets/comunidad/entrenamiento_staff.webp';
+export const PARQUE_KIOSCO_IMAGE = '/assets/comunidad/kiosco_parque_cerezos.webp';
+export const CEREMONIA_KIOSCO_IMAGE = '/assets/comunidad/ceremonia_kiosco_grupo.webp';
+export const CALLE_BROOKHAVEN_IMAGE = '/assets/comunidad/calle_brookhaven_dia.webp';
+// Imágenes ilustrativas (pendientes de reemplazar por capturas reales)
 export const POLICE_IMAGE = '/assets/images/clicmaster_police_dept_1793308351382.webp';
 export const HOSPITAL_IMAGE = '/assets/images/clicmaster_hospital_ems_1793308352910.webp';
 export const FIRE_IMAGE = '/assets/images/clicmaster_fire_rescue_1793308352964.webp';
@@ -71,7 +83,7 @@ export const FEATURED_EVENTS: ServerEvent[] = [
     location: 'Distrito Financiero y Brookhaven Heights',
     rewards: '1,000,000 CLIC Coins + Skin Táctica Exclusiva + Pase VIP Oro',
     registeredCount: 842,
-    image: HERO_IMAGE,
+    image: PURGA_NOCTURNA_IMAGE,
   },
   {
     id: 'circuito-supercars-aurum',
@@ -99,7 +111,7 @@ export const FEATURED_EVENTS: ServerEvent[] = [
     location: 'Torre Central Brookhaven y Hospital SAMUR',
     rewards: 'Ascenso Rápido de Rango + Bono Institucional de Nómina',
     registeredCount: 310,
-    image: FIRE_IMAGE,
+    image: AMBULANCIA_IMAGE,
   },
 ];
 
@@ -116,7 +128,7 @@ export const MAP_POIS: MapPOI[] = [
     description:
       'Centro médico de máxima complejidad con quirófanos de alta tecnología, helipuerto de emergencias y flota de 12 ambulancias activas.',
     services: ['Urgencias 24h', 'Cirugías de trauma', 'Certificados médicos para DNI', 'Reanimación avanzada'],
-    image: HOSPITAL_IMAGE,
+    image: AMBULANCIA_IMAGE,
   },
   {
     id: 'poi-policia',
@@ -130,7 +142,7 @@ export const MAP_POIS: MapPOI[] = [
     description:
       'Sede principal de las fuerzas del orden. Cuenta con armería de alta seguridad, celdas de detención preventiva, unidad canina K-9 y división de tráfico.',
     services: ['Denuncias ciudadanas', 'Licencias de armas', 'Radares de velocidad', 'Unidad táctica SWAT'],
-    image: POLICE_IMAGE,
+    image: STAFF_POLICIA_IMAGE,
   },
   {
     id: 'poi-bomberos',
@@ -158,7 +170,7 @@ export const MAP_POIS: MapPOI[] = [
     description:
       'Sede de la Alcaldía y el Poder Judicial. Lugar donde se tramitan escrituras públicas, matrimonios civiles, licencias comerciales y juicios orales.',
     services: ['Registro civil', 'Creación de empresas', 'Audiencias judiciales', 'Pago de impuestos municipales'],
-    image: HERO_IMAGE,
+    image: GOBIERNO_IMAGE,
   },
   {
     id: 'poi-banco',
@@ -172,7 +184,7 @@ export const MAP_POIS: MapPOI[] = [
     description:
       'El corazón económico de la metrópolis. Custodia millones en lingotes y bóvedas digitales. Equipado con sensores sísmicos y esclusas antibalas.',
     services: ['Apertura de cuentas corrientes', 'Cajas de seguridad', 'Créditos hipotecarios', 'Transferencias interbancarias'],
-    image: HERO_IMAGE,
+    image: PRENSA_GOBIERNO_IMAGE,
   },
   {
     id: 'poi-concesionario',
@@ -199,7 +211,7 @@ export const MAP_POIS: MapPOI[] = [
     description:
       'Centro de formación para futuros médicos, agentes y mecánicos. Otorga títulos necesarios para ascensos rápidos en facciones.',
     services: ['Clases teóricas de rol', 'Academia de conducción', 'Carreras técnicas'],
-    image: HERO_IMAGE,
+    image: ENTRENAMIENTO_IMAGE,
   },
   {
     id: 'poi-parque',
@@ -212,7 +224,7 @@ export const MAP_POIS: MapPOI[] = [
     description:
       'Área verde de 40 hectáreas con senderos arbolados, fuentes luminosas, quioscos de comida y zona de conciertos al aire libre.',
     services: ['Puntos de encuentro social', 'Puestos de comida callejera', 'Área de picnic y descanso'],
-    image: HERO_IMAGE,
+    image: PARQUE_KIOSCO_IMAGE,
   },
   {
     id: 'poi-gasolinera',
@@ -225,7 +237,7 @@ export const MAP_POIS: MapPOI[] = [
     description:
       'Servicio de repostaje rápido de combustible, cambio de neumáticos de competición y tienda de conveniencia.',
     services: ['Combustible 98 octanos', 'Reparación mecánica express', 'Lavadero automático'],
-    image: HERO_IMAGE,
+    image: CALLE_BROOKHAVEN_IMAGE,
   },
   {
     id: 'poi-casas',
@@ -238,7 +250,7 @@ export const MAP_POIS: MapPOI[] = [
     description:
       'Complejo de mansiones con piscinas infinity, helipuertos privados y seguridad vecinal armada.',
     services: ['Venta y arriendo de propiedades', 'Sistemas de alarma inteligente', 'Garajes privados múltiples'],
-    image: HERO_IMAGE,
+    image: CALLE_BROOKHAVEN_IMAGE,
   },
   {
     id: 'poi-aeropuerto',
@@ -252,7 +264,7 @@ export const MAP_POIS: MapPOI[] = [
     description:
       'Pistas de aterrizaje comerciales y terminal de jets privados con servicio de paracaidismo y vuelos panorámicos.',
     services: ['Hangar de aviones privados', 'Escuela de aviación', 'Control de aduanas'],
-    image: HERO_IMAGE,
+    image: GOBIERNO_IMAGE,
   },
 ];
 
@@ -267,7 +279,7 @@ export const DEPARTMENTS_DATA: DepartmentFaction[] = [
       'La institución policial de élite encargada de patrullajes preventivos, persecuciones a alta velocidad, investigaciones encubiertas y operativos tácticos SWAT. Protocolos serios basados en códigos radiales 10 reales.',
     membersCount: 142,
     headOfDepartment: 'Comisario General Rodriguez',
-    image: POLICE_IMAGE,
+    image: STAFF_POLICIA_IMAGE,
     ranks: ['Cadete', 'Oficial I', 'Oficial II', 'Sargento', 'Teniente', 'Capitán', 'Comisario'],
     requirements: [
       'Nivel mínimo 10 en el servidor',
@@ -289,7 +301,7 @@ export const DEPARTMENTS_DATA: DepartmentFaction[] = [
       'El cuerpo médico responsable del cuidado hospitalario y traslados de urgencia en toda la región. Manejo de camillas, desfibriladores, diagnóstico en sitio y triaje durante catástrofes urbanas.',
     membersCount: 98,
     headOfDepartment: 'Dra. Valentina Morales (Directora Médica)',
-    image: HOSPITAL_IMAGE,
+    image: AMBULANCIA_IMAGE,
     ranks: ['Paramédico Práctico', 'Enfermero de Urgencias', 'Médico General', 'Cirujano Especialista', 'Jefe de Guardia', 'Director Médico'],
     requirements: [
       'Nivel mínimo 8 en el servidor',
@@ -330,7 +342,7 @@ export const DEPARTMENTS_DATA: DepartmentFaction[] = [
       'Gremio de empresarios que manejan concesionarios de lujo como Aurum Motors, talleres mecánicos, discotecas nocturnas, empresas de seguridad privada y firmas de bienes raíces.',
     membersCount: 215,
     headOfDepartment: 'Consejo de Administración Comercial',
-    image: DEALERSHIP_IMAGE,
+    image: ENTRENAMIENTO_IMAGE,
     ranks: ['Empleado', 'Supervisor', 'Gerente de Sucursal', 'Socio Comercial', 'Director Ejecutivo (CEO)'],
     requirements: [
       'Capital inicial mínimo de $150,000 CLIC Coins',
@@ -350,7 +362,7 @@ export const DEPARTMENTS_DATA: DepartmentFaction[] = [
       'El poder ejecutivo y judicial de CLICMaster. Se encarga de redacción de decretos, emisión de licencias de casinos y negocios, juicios con jurado popular y apelaciones legales.',
     membersCount: 45,
     headOfDepartment: 'Alcalde Constitucional',
-    image: HERO_IMAGE,
+    image: GOBIERNO_IMAGE,
     ranks: ['Oficial Notarial', 'Secretario Judicial', 'Fiscal Acusador', 'Abogado Defensor', 'Juez de Primera Instancia', 'Alcalde'],
     requirements: [
       'Conocimiento integral del Código Penal y Normativas de Rol',
@@ -370,7 +382,7 @@ export const DEPARTMENTS_DATA: DepartmentFaction[] = [
       'La base vibrante de la ciudad. Conductores de taxi, periodistas con cámaras en vivo cubriendo noticias de última hora, baristas y ciudadanos que forjan su destino.',
     membersCount: 1850,
     headOfDepartment: 'Colegio de Periodistas y Transporte',
-    image: HERO_IMAGE,
+    image: PRENSA_GOBIERNO_IMAGE,
     ranks: ['Ciudadano Nuevo', 'Residente Registrado', 'Profesional Certificado', 'Ciudadano Ilustre'],
     requirements: [
       'DNI expedido en el portal oficial',
@@ -408,7 +420,7 @@ export const NEWS_ARTICLES: NewsItem[] = [
     date: '25 Octubre, 2026',
     readTime: '4 min de lectura',
     author: 'Departamento de Prensa RPD',
-    image: POLICE_IMAGE,
+    image: ENTRENAMIENTO_IMAGE,
     likes: 215,
   },
   {
@@ -422,7 +434,7 @@ export const NEWS_ARTICLES: NewsItem[] = [
     date: '20 Octubre, 2026',
     readTime: '2 min de lectura',
     author: 'Dra. Valentina Morales',
-    image: HOSPITAL_IMAGE,
+    image: AMBULANCIA_IMAGE,
     likes: 189,
   },
   {
@@ -436,7 +448,7 @@ export const NEWS_ARTICLES: NewsItem[] = [
     date: '16 Octubre, 2026',
     readTime: '3 min de lectura',
     author: 'Comité de Eventos',
-    image: HERO_IMAGE,
+    image: SHOW_NOCHE_IMAGE,
     likes: 412,
   },
 ];

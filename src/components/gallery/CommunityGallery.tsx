@@ -8,6 +8,12 @@ const GALLERY_PUENTE = '/assets/gallery/clicmaster_puente_peatonal.webp';
 const GALLERY_AUTOPISTA = '/assets/gallery/clicmaster_autopista_bahia.webp';
 const GALLERY_TORRE = '/assets/gallery/clicmaster_torre_rascacielos.webp';
 const GALLERY_BOULEVARD = '/assets/gallery/clicmaster_costanera_boulevard.webp';
+const GALLERY_ESCENARIO = '/assets/comunidad/evento_escenario_luces.webp';
+const GALLERY_CEREMONIA = '/assets/comunidad/ceremonia_kiosco_noche.webp';
+const GALLERY_STAFF = '/assets/comunidad/staff_policia_patrulla.webp';
+const GALLERY_ENTRENAMIENTO = '/assets/comunidad/entrenamiento_staff.webp';
+const GALLERY_GABINETE = '/assets/comunidad/reunion_gabinete_gobierno.webp';
+const GALLERY_AMBULANCIA = '/assets/comunidad/ambulancia_samur.webp';
 
 interface GalleryItem {
   id: string;
@@ -71,9 +77,57 @@ export const CommunityGallery: React.FC = () => {
       description: 'Avenida costera bordeada de palmeras con tránsito de vehículos, peatones paseando y vista panorámica al océano.',
       photographer: '@RoleplayLatam',
     },
+    {
+      id: 'gal-7',
+      title: 'Show de Luces en el Escenario',
+      category: 'Eventos',
+      image: GALLERY_ESCENARIO,
+      description: 'Noche de evento con reflectores de colores, tarima iluminada y la comunidad reunida frente al escenario.',
+      photographer: '@Comunidad_CLIC',
+    },
+    {
+      id: 'gal-8',
+      title: 'Ceremonia Nocturna en el Kiosco',
+      category: 'Eventos',
+      image: GALLERY_CEREMONIA,
+      description: 'Miembros de la comunidad reunidos de gala en el kiosco del parque, rodeados de cerezos bajo el cielo nocturno.',
+      photographer: '@Comunidad_CLIC',
+    },
+    {
+      id: 'gal-9',
+      title: 'Patrulla Nocturna con el Staff',
+      category: 'Roleplay',
+      image: GALLERY_STAFF,
+      description: 'Staff, policía y ciudadanos coordinando una escena de rol en plena avenida durante la noche.',
+      photographer: '@Comunidad_CLIC',
+    },
+    {
+      id: 'gal-10',
+      title: 'Entrenamiento Oficial del Equipo',
+      category: 'Roleplay',
+      image: GALLERY_ENTRENAMIENTO,
+      description: 'Sesión de entrenamiento con líderes de turno, gerentes y asistentes preparando a los nuevos integrantes.',
+      photographer: '@Comunidad_CLIC',
+    },
+    {
+      id: 'gal-11',
+      title: 'Reunión de Gabinete en el Palacio',
+      category: 'Roleplay',
+      image: GALLERY_GABINETE,
+      description: 'Alcalde, ministros y prensa reunidos en la sala de gobierno, con el helipuerto presidencial de fondo.',
+      photographer: '@Comunidad_CLIC',
+    },
+    {
+      id: 'gal-12',
+      title: 'Traslado de Emergencia SAMUR',
+      category: 'Roleplay',
+      image: GALLERY_AMBULANCIA,
+      description: 'Paramédicos atendiendo a un paciente dentro de la ambulancia rumbo al hospital central.',
+      photographer: '@Comunidad_CLIC',
+    },
   ];
 
-  const categories = ['Todas', 'Ciudad', 'Comunidad', 'Infraestructura', 'Costanera'];
+  const categories = ['Todas', 'Eventos', 'Roleplay', 'Ciudad', 'Comunidad', 'Infraestructura', 'Costanera'];
 
   const filteredItems =
     activeCategory === 'Todas'
